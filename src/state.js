@@ -13,6 +13,8 @@ export function createGame() {
     stars: 0,
     fish: [],
     latched: null,
+    bubbles: [],
+    spawnTimer: 0,
     grid: createGrid(BACKPACK.cols, BACKPACK.rows),
     hook: null,
   };
