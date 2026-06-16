@@ -1,7 +1,7 @@
 import { WORLD, BACKPACK } from './config.js';
 import { createGame, placeHook, startDescent } from './state.js';
 import { stepDescent } from './sim.js';
-import { attachInput, clampHookX } from './input.js';
+import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
 
 const canvas = document.getElementById('game');
@@ -9,10 +9,12 @@ const ctx = canvas.getContext('2d');
 
 let s = createGame();
 let hookX = WORLD.W / 2;
+let hookY = WORLD.hookStartY;
 
 function reset() {
   s = createGame();
   hookX = WORLD.W / 2;
+  hookY = WORLD.hookStartY;
 }
 
 attachInput(canvas, {
@@ -29,10 +31,10 @@ attachInput(canvas, {
     } else if (s.mode === 'END') {
       reset();
     } else if (s.mode === 'DESCENT') {
-      hookX = clampHookX(x);
+      hookX = clampHookX(x); hookY = clampHookY(y);
     }
   },
-  onPointerMove(x) { if (s.mode === 'DESCENT') hookX = clampHookX(x); },
+  onPointerMove(x, y) { if (s.mode === 'DESCENT') { hookX = clampHookX(x); hookY = clampHookY(y); } },
   onPointerUp() {},
 });
 
@@ -40,8 +42,8 @@ let last = 0;
 function loop(ts) {
   const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0;
   last = ts;
-  stepDescent(s, hookX, dt);
-  render(ctx, s, hookX);
+  stepDescent(s, hookX, hookY, dt);
+  render(ctx, s, hookX, hookY);
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

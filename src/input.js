@@ -24,3 +24,7 @@ export function attachInput(canvas, handlers) {
 export function clampHookX(x) {
   return Math.max(WORLD.hookMinX, Math.min(WORLD.hookMaxX, x));
 }
+
+export function clampHookY(y) {
+  return Math.max(WORLD.hookMinY, Math.min(WORLD.hookMaxY, y));
+}

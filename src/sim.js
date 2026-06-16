@@ -11,7 +11,7 @@ function removeFish(s, f) {
   if (i >= 0) s.fish.splice(i, 1);
 }
 
-export function stepDescent(s, hookX, dt, rng = Math.random) {
+export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   if (s.mode !== 'DESCENT') return;
   const depthM = s.depthPx / WORLD.pxPerMeter;
   const diff = difficultyAt(depthM);
@@ -28,10 +28,13 @@ export function stepDescent(s, hookX, dt, rng = Math.random) {
     s.fish.push(f);
   }
 
-  const hookWorldY = s.depthPx + WORLD.hookStartY;
+  const hookWorldY = s.depthPx + hookScreenY;
 
   // latch / damage
   if (s.latched) {
+    // ryba zaczepiona — zwisamy z haka, podążamy za przesunięciami pozimymi gracza
+    s.latched.x = hookX;
+    s.latched.y = hookWorldY + 4;
     const res = tickLatch(s.latched, s.hook.atk, dt);
     if (res === 'stunned') {
       registerStun(s, FISH_TYPES[s.latched.type]);
@@ -53,6 +56,9 @@ export function stepDescent(s, hookX, dt, rng = Math.random) {
       const r = FISH_TYPES[f.type].radius;
       if (Math.hypot(f.x - hookX, f.y - hookWorldY) <= r + 8) {
         startLatch(f);
+        // snap do haka — ryba wisi na haku, nie obok niego
+        f.x = hookX;
+        f.y = hookWorldY + 4;
         s.latched = f;
       }
     }

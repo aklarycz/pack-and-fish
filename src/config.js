@@ -3,9 +3,13 @@ export const WORLD = {
   W: 540,
   H: 720,
   pxPerMeter: 40,
-  hookStartY: 90,        // y ekranowy haka (stały — kamera scrolluje świat)
+  topBarH: 56,           // pasek HUD u góry (score/życia/głębia) — hak tu nie wchodzi
+  hookStartY: 200,       // startowa pozycja Y haka (ekran), wewnątrz pasma ruchu
   hookMinX: 40,
   hookMaxX: 500,
+  // Pasmo swobodnego ruchu haka: górne 2/5 ekranu, pod top barem.
+  hookMinY: 80,          // tuż pod top barem
+  hookMaxY: 288,         // 720 * 2/5 — dolna granica pasma haka
 };
 
 // Startowy hak = item w plecaku. Celowo SŁABY (patrz spec: nie stroimy pod "fun solo").
