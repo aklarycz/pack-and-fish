@@ -6,9 +6,9 @@ export function computeScore(depthMeters, stunnedPoints) {
   return Math.round(depthPart + stunnedPoints * SCORE.wStun);
 }
 
-export function computeStars(score) {
-  if (score >= STARS.t3) return 3;
-  if (score >= STARS.t2) return 2;
-  if (score >= STARS.t1) return 1;
+export function computeStars(score, thresholds = STARS) {
+  if (score >= thresholds.t3) return 3;
+  if (score >= thresholds.t2) return 2;
+  if (score >= thresholds.t1) return 1;
   return 0;
 }

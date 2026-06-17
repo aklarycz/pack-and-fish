@@ -32,3 +32,7 @@ npm-debug.log*
 .cache/
 .parcel-cache/
 .tmp/
+
+# Dev helpers (lokalny serwer / podglady)
+__serve.py
+__*.html

@@ -13,18 +13,38 @@ function removeFish(s, f) {
 
 export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   if (s.mode !== 'DESCENT') return;
-  const depthM = s.depthPx / WORLD.pxPerMeter;
+  // trudność liczona od głębokości + offsetu stage'a (stage startuje "głębiej")
+  const depthM = s.depthPx / WORLD.pxPerMeter + (s.stageOffsetM || 0);
   const diff = difficultyAt(depthM);
   addDepth(s, s.hook.szybkoscOpadania * dt);
 
-  // spawn poniżej dolnej krawędzi
+  // spawn — GŁÓWNIE z boków (ryba wpływa poziomo do środka i przecina scenę),
+  // część z dołu dla urozmaicenia. Boczny spawn sprawia, że dominującym ruchem
+  // jest pływanie w bok, a nie "lecenie w górę" przez cały ekran.
   s.spawnTimer -= dt;
   if (s.spawnTimer <= 0) {
     s.spawnTimer = diff.spawnInterval;
     const type = pickFishType(depthM, rng);
-    const x = WORLD.hookMinX + rng() * (WORLD.hookMaxX - WORLD.hookMinX);
-    const f = createFish(type, depthM, x);
-    f.y = s.depthPx + WORLD.H + 30;
+    // WSZYSTKIE ryby pojawiają się PONIŻEJ granicy ruchu haka (hookMaxY) — gracz
+    // zawsze widzi je nadpływające z dołu i ma czas zaplanować.
+    const spawnTop = WORLD.hookMaxY + 50;
+    let fx, fy, fdir;
+    if (rng() < 0.75) {
+      // z boku: tuż za krawędzią (w obrębie EDGE_MARGIN, by nie zawróciła od razu),
+      // na losowej wysokości poniżej granicy; płynie do środka
+      const left = rng() < 0.5;
+      fx = left ? WORLD.hookMinX - 35 : WORLD.hookMaxX + 35;
+      fdir = left ? 1 : -1;
+      fy = s.depthPx + spawnTop + rng() * (WORLD.H - spawnTop);
+    } else {
+      // z dołu: pełna szerokość, kierunek losowy
+      fx = WORLD.hookMinX + rng() * (WORLD.hookMaxX - WORLD.hookMinX);
+      fdir = rng() < 0.5 ? 1 : -1;
+      fy = s.depthPx + WORLD.H + 30;
+    }
+    const f = createFish(type, depthM, fx, rng);
+    f.y = fy;
+    f.dir = fdir;
     s.fish.push(f);
   }
 

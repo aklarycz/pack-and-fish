@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, placeHook, startDescent } from '../src/state.js';
+import { createGame, placeHook, startStage } from '../src/state.js';
 import { stepDescent } from '../src/sim.js';
 import { WORLD } from '../src/config.js';
 
 function started() {
-  const s = createGame(); placeHook(s, 0, 0); startDescent(s);
+  const s = createGame(); placeHook(s, 0, 0); startStage(s);
   return s;
 }
 

@@ -22,10 +22,13 @@ export function updateFish(fish, hookX, hookWorldY, dt, speedMul, rng = Math.ran
   // schodzenia kamery (wrażenie zanurzania haka, nie "ryby płynące do góry").
   if (fish.baseY === undefined) fish.baseY = fish.y;
 
+  // per-rybi mnożnik prędkości — jedne pływają szybciej, drugie wolniej (stabilny z phaseX)
+  const indiv = 0.8 + ((Math.sin((fish.phaseX || 0) * 1.7) + 1) / 2) * 0.5; // 0.8..1.3
+
   if (fish.state === 'patrol') {
-    // ruch GŁÓWNIE poziomy — gładko zmienna prędkość driftu
-    const driftMod = 0.45 + Math.sin(fish.t * 0.6 + (fish.phaseX || 0)) * 0.3;
-    fish.x += fish.dir * speed * driftMod * dt;
+    // ruch GŁÓWNIE poziomy — zmienna prędkość driftu, dominuje nad scrollem opadania
+    const driftMod = 0.7 + Math.sin(fish.t * 0.6 + (fish.phaseX || 0)) * 0.3; // 0.4..1.0
+    fish.x += fish.dir * speed * indiv * driftMod * dt;
     // delikatny bujak pionowy (anti-sync przez phase offset)
     fish.y = fish.baseY + Math.sin(fish.t * 1.4 + (fish.phaseY || 0)) * (fish.bobAmp || 6);
     // losowy zwrot co kilka sekund — naturalna nawigacja
@@ -44,7 +47,7 @@ export function updateFish(fish, hookX, hookWorldY, dt, speedMul, rng = Math.ran
     // natarcie GŁÓWNIE poziome: dopływa do kolumny haka. Pion zostawiamy
     // opadającemu hakowi (który i tak schodzi przez głębokość ryby) — tylko bujak.
     const dx = hookX - fish.x;
-    fish.x += Math.sign(dx) * Math.min(Math.abs(dx), speed * 1.3 * dt);
+    fish.x += Math.sign(dx) * Math.min(Math.abs(dx), speed * indiv * 1.3 * dt);
     fish.y = fish.baseY + Math.sin(fish.t * 2.0 + (fish.phaseY || 0)) * (fish.bobAmp || 6) * 0.4;
   }
 }
