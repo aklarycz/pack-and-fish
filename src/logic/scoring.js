@@ -1,8 +1,9 @@
 import { SCORE, STARS } from '../config.js';
 
 // stunnedPoints = suma scoreValue ogłuszonych ryb (wołający podaje już zsumowane jednostki).
-export function computeScore(depthMeters, stunnedPoints) {
-  const depthPart = Math.min(depthMeters * SCORE.wDepth, SCORE.depthCeil);
+// depthCap = sufit wkładu głębi (per-stage; domyślnie SCORE.depthCeil).
+export function computeScore(depthMeters, stunnedPoints, depthCap = SCORE.depthCeil) {
+  const depthPart = Math.min(depthMeters * SCORE.wDepth, depthCap);
   return Math.round(depthPart + stunnedPoints * SCORE.wStun);
 }
 

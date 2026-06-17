@@ -1,4 +1,5 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS } from './config.js';
+import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
 const _imgCache = {};
@@ -116,9 +117,9 @@ function renderHome(ctx, s) {
   if (xpFrac > 0) fillRR(ctx, xpX, xpY, xpW * xpFrac, xpH, xpH / 2, '#52d0ff');
   // chipy (energia / gemy / złoto) — prawy align do 0.95W
   const chW = W * 0.165, chH = H * 0.046, chU = H * 0.012, chY = H * 0.046;
-  chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', '4.2k');
-  chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '120');
-  chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '25');
+  chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', String(s.progress.coins)); // złoto = realne monety
+  chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');          // gemy (placeholder)
+  chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');    // energia (brak gate'u)
 
   // === D: START ===
   const btnW = W * 0.66, btnH = H * 0.092, bx = cx - btnW / 2, byy = H * 0.715 - btnH / 2;
@@ -160,14 +161,44 @@ function renderHome(ctx, s) {
     if (k === 1) backpack = { x: tcx - W * 0.10, y: tabY, w: W * 0.20, h: tabH };
   }
 
+  // skrzynka do odebrania (jeśli jest oczekująca)
+  let chest = null;
+  if (s.progress.pendingChests > 0) {
+    chest = { x: W * 0.05, y: H * 0.47, w: W * 0.17, h: W * 0.17 };
+    fillRR(ctx, chest.x, chest.y, chest.w, chest.h, 8, '#3a2f12');
+    rrPath(ctx, chest.x, chest.y, chest.w, chest.h, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#ffcb45'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(chest.w * 0.2)}px sans-serif`;
+    ctx.fillText('SKRZYNIA', chest.x + chest.w / 2, chest.y + chest.h * 0.58);
+    ctx.beginPath(); ctx.arc(chest.x + chest.w, chest.y, 12, 0, Math.PI * 2); ctx.fillStyle = '#ff4d4d'; ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(String(s.progress.pendingChests), chest.x + chest.w, chest.y + 5);
+  }
+
   ctx.textAlign = 'left';
   const ar = W * 0.055;
   s._home = {
     stage: { x: ax, y: ay, w: S, h: S },
     left: { x: W * 0.085 - ar, y: cyArt - ar, w: ar * 2, h: ar * 2 },
     right: { x: W * 0.915 - ar, y: cyArt - ar, w: ar * 2, h: ar * 2 },
-    start, backpack,
+    start, backpack, chest,
   };
+
+  // overlay otwarcia skrzynki
+  if (s.chestReveal) {
+    ctx.fillStyle = 'rgba(3,12,20,0.9)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#ffd166'; ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`;
+    ctx.fillText('SKRZYNIA!', cx, H * 0.36);
+    ctx.fillStyle = '#7fe0a0'; ctx.font = `${Math.round(H * 0.032)}px sans-serif`;
+    ctx.fillText('+' + s.chestReveal.sc + ' monet', cx, H * 0.45);
+    if (s.chestReveal.anchor) {
+      ctx.fillStyle = '#9fd0ff';
+      ctx.fillText('Nowe akcesorium: Kotwica', cx, H * 0.52);
+      ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`;
+      ctx.fillText('Włóż ją w plecaku: +1 ryba naraz', cx, H * 0.56);
+    }
+    ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`;
+    ctx.fillText('Tap, by zamknąć', cx, H * 0.64);
+    ctx.textAlign = 'left';
+  }
 }
 
 function drawCover(ctx, im, x, y, w, h) {
@@ -243,35 +274,56 @@ function roundedBtn(ctx, r, color, label) {
   ctx.textAlign = 'left';
 }
 
+function drawItemCell(ctx, it, x, y, cell) {
+  const pad = cell * 0.12;
+  fillRR(ctx, x + pad, y + pad, cell - 2 * pad, cell - 2 * pad, 6, it.kind === 'hook' ? '#cdbb6a' : '#5aa9e0');
+  ctx.fillStyle = '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(cell * 0.16)}px sans-serif`;
+  ctx.fillText(it.kind === 'hook' ? 'HAK' : 'KOTW', x + cell / 2, y + cell / 2 + cell * 0.06);
+}
+
 function renderBackpack(ctx, s) {
-  ctx.fillStyle = '#0a2236'; ctx.fillRect(0, 0, WORLD.W, WORLD.H);
-  ctx.fillStyle = '#e6f0ff'; ctx.font = '22px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('Włóż hak do plecaka', WORLD.W / 2, 90);
+  const W = WORLD.W, H = WORLD.H;
+  ctx.fillStyle = '#0a2236'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#e6f0ff'; ctx.font = `bold ${Math.round(H * 0.03)}px sans-serif`; ctx.textAlign = 'center';
+  ctx.fillText(s.hook ? 'Plecak' : 'Włóż hak do plecaka', W / 2, H * 0.08);
+
   const gw = BACKPACK.cols * BACKPACK.cell, gh = BACKPACK.rows * BACKPACK.cell;
-  const ox = (WORLD.W - gw) / 2, oy = 150;
+  const ox = (W - gw) / 2, oy = H * 0.13;
   for (let r = 0; r < BACKPACK.rows; r++) for (let c = 0; c < BACKPACK.cols; c++) {
-    ctx.strokeStyle = '#2c5a82'; ctx.lineWidth = 2;
-    ctx.strokeRect(ox + c * BACKPACK.cell, oy + r * BACKPACK.cell, BACKPACK.cell, BACKPACK.cell);
-    if (s.grid.cells[r * BACKPACK.cols + c]) {
-      ctx.fillStyle = '#cdbb6a';
-      ctx.fillRect(ox + c * BACKPACK.cell + 12, oy + r * BACKPACK.cell + 12, BACKPACK.cell - 24, BACKPACK.cell - 24);
-    }
+    const cellX = ox + c * BACKPACK.cell, cellY = oy + r * BACKPACK.cell;
+    ctx.strokeStyle = '#2c5a82'; ctx.lineWidth = 2; ctx.strokeRect(cellX, cellY, BACKPACK.cell, BACKPACK.cell);
+    const id = s.grid.cells[r * BACKPACK.cols + c];
+    if (id && ITEMS[id]) drawItemCell(ctx, ITEMS[id], cellX, cellY, BACKPACK.cell);
   }
-  if (!s.hook) {
-    ctx.fillStyle = '#ffd166';
-    ctx.fillText('↓ ' + STARTER_HOOK.name + ' ↓ — włóż go w plecak', WORLD.W / 2, oy + gh + 46);
-    s._backpackBack = null;
-  } else {
-    ctx.fillStyle = '#7fffa1';
-    ctx.fillText('Hak gotowy!', WORLD.W / 2, oy + gh + 46);
-    const bw = Math.round(WORLD.W * 0.34), bh = Math.round(WORLD.H * 0.07);
-    const back = { x: WORLD.W / 2 - bw / 2, y: oy + gh + 70, w: bw, h: bh };
-    roundedBtn(ctx, back, '#2e7d4f', 'WRÓĆ NA HOME');
-    s._backpackBack = back;
-  }
-  ctx.textAlign = 'left';
-  // współrzędne gridu udostępnione main.js przez ten sam wzór (ox, oy, cell)
   s._grid = { ox, oy, cell: BACKPACK.cell };
+
+  let y = oy + gh + H * 0.045;
+  s._bpInv = [];
+  if (!s.hook) {
+    ctx.fillStyle = '#ffd166'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText('Tap pole, by włożyć: ' + STARTER_HOOK.name, W / 2, y);
+  } else {
+    const inv = Object.entries(s.progress.inventory).filter(([, n]) => n > 0);
+    ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText(inv.length ? 'Ekwipunek — tap, by włożyć:' : 'Brak akcesoriów — zdobądź skrzynię na Home', W / 2, y);
+    y += H * 0.02;
+    const cell = BACKPACK.cell * 0.9;
+    const rowW = inv.length * cell + (inv.length - 1) * 10;
+    inv.forEach(([id, n], k) => {
+      const r = { x: W / 2 - rowW / 2 + k * (cell + 10), y, w: cell, h: cell };
+      drawItemCell(ctx, ITEMS[id], r.x, r.y, cell);
+      ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(cell * 0.2)}px sans-serif`; ctx.textAlign = 'right';
+      ctx.fillText('x' + n, r.x + r.w - 4, r.y + r.h - 6);
+      s._bpInv.push({ rect: r, id });
+    });
+    y += cell + H * 0.03;
+  }
+
+  const bw = Math.round(W * 0.4), bh = Math.round(H * 0.07);
+  const back = { x: W / 2 - bw / 2, y: Math.min(y, H - bh - H * 0.04), w: bw, h: bh };
+  roundedBtn(ctx, back, '#2e7d4f', s.hook ? 'WRÓĆ NA HOME' : 'WRÓĆ');
+  s._backpackBack = back;
+  ctx.textAlign = 'left';
 }
 
 function renderDescent(ctx, s, hookX, hookY) {
@@ -356,13 +408,21 @@ function renderDescent(ctx, s, hookX, hookY) {
   ctx.fillStyle = 'rgba(4,18,31,0.9)'; ctx.fillRect(0, 0, WORLD.W, WORLD.topBarH);
   ctx.strokeStyle = 'rgba(127,209,255,0.25)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, WORLD.topBarH + 0.5); ctx.lineTo(WORLD.W, WORLD.topBarH + 0.5); ctx.stroke();
-  const baseY = Math.round(WORLD.topBarH / 2) + 7;
+  const baseY = Math.round(WORLD.topBarH / 2) + 6;
+  // życia (lewo)
   ctx.fillStyle = '#ff6b8a'; ctx.font = '20px sans-serif'; ctx.textAlign = 'left';
-  ctx.fillText('❤'.repeat(s.lives), 14, baseY);
-  ctx.fillStyle = '#9fd0ff'; ctx.font = '18px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(Math.round(s.depthPx / WORLD.pxPerMeter) + ' m', WORLD.W / 2, baseY);
+  ctx.fillText('❤'.repeat(s.lives), 12, baseY);
+  // głębia (prawo)
+  ctx.fillStyle = '#9fd0ff'; ctx.font = '16px sans-serif'; ctx.textAlign = 'right';
+  ctx.fillText(Math.round(s.depthPx / WORLD.pxPerMeter) + ' m', WORLD.W - 12, baseY);
+  // score + palące się gwiazdki (środek) — na bieżąco wg progów stage'a
+  const liveStars = computeStars(s.score, STAGES[s.stageIndex].stars);
+  const starR = WORLD.topBarH * 0.16, sgap = starR * 2.5, groupW = 3 * sgap;
+  const scoreRight = WORLD.W / 2 - groupW / 2 - 8;
   ctx.fillStyle = '#ffd166'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'right';
-  ctx.fillText(s.score + ' pkt · ' + s.stunned + ' ryb', WORLD.W - 14, baseY);
+  ctx.fillText(s.score + ' pkt', scoreRight, baseY);
+  const starsX0 = scoreRight + 12;
+  for (let k = 0; k < 3; k++) star(ctx, starsX0 + sgap * (k + 0.5), baseY - 6, starR, k < liveStars);
   ctx.textAlign = 'left';
 }
 
@@ -400,21 +460,27 @@ function drawParticles(ctx, camY, parallax, spacing, size, alpha) {
 }
 
 function renderEnd(ctx, s) {
-  const cx = WORLD.W / 2;
-  ctx.fillStyle = 'rgba(3,12,20,0.86)'; ctx.fillRect(0, 0, WORLD.W, WORLD.H);
-  ctx.textAlign = 'center'; ctx.fillStyle = '#e6f0ff';
+  const cx = WORLD.W / 2, H = WORLD.H;
+  ctx.fillStyle = 'rgba(3,12,20,0.86)'; ctx.fillRect(0, 0, WORLD.W, H);
+  ctx.textAlign = 'center';
   const st = STAGES[s.stageIndex];
-  ctx.font = '22px sans-serif';
-  ctx.fillText('Stage ' + st.id + ' — ' + st.name, cx, 200);
-  ctx.font = '52px sans-serif'; ctx.fillStyle = '#ffd166';
-  ctx.fillText('★'.repeat(s.stars) + '☆'.repeat(3 - s.stars), cx, 280);
-  ctx.fillStyle = '#e6f0ff'; ctx.font = '20px sans-serif';
-  ctx.fillText('Głębia ' + Math.round(s.depthPx / WORLD.pxPerMeter) + ' m · ' + s.stunned + ' ryb · ' + s.score + ' pkt', cx, 330);
+  ctx.fillStyle = '#e6f0ff'; ctx.font = `${Math.round(H * 0.03)}px sans-serif`;
+  ctx.fillText(st.id + '. ' + st.name, cx, H * 0.30);
+  // status: wyczyszczone vs fail
+  const cleared = s.lastResult && s.lastResult.cleared;
+  ctx.fillStyle = cleared ? '#7fffa1' : '#ff9a9a'; ctx.font = `bold ${Math.round(H * 0.034)}px sans-serif`;
+  ctx.fillText(cleared ? 'Łowisko wyczyszczone!' : 'Ryby uciekły!', cx, H * 0.35);
+  // gwiazdki (wektorowe)
+  const sr = H * 0.035, sg = sr * 2.6;
+  for (let k = 0; k < 3; k++) star(ctx, cx - sg + k * sg, H * 0.43, sr * (k === 1 ? 1.1 : 1), k < s.stars);
+  // staty
+  ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.026)}px sans-serif`;
+  ctx.fillText('Głębia ' + Math.round(s.depthPx / WORLD.pxPerMeter) + ' m · ' + s.stunned + ' ryb · ' + s.score + ' pkt', cx, H * 0.50);
   if (s.lastResult && s.lastResult.newUnlock) {
-    ctx.fillStyle = '#7fffa1'; ctx.fillText('Odblokowano kolejny stage!', cx, 372);
+    ctx.fillStyle = '#7fffa1'; ctx.fillText('Odblokowano kolejny stage!', cx, H * 0.55);
   } else if (s.stars === 0) {
-    ctx.fillStyle = '#ffd166'; ctx.fillText('Hak za słaby — wzmocnij się', cx, 372);
+    ctx.fillStyle = '#ffd166'; ctx.fillText('Wzmocnij hak w plecaku', cx, H * 0.55);
   }
-  ctx.fillStyle = '#9fd0ff'; ctx.fillText('Tap — wróć na Home', cx, 432);
+  ctx.fillStyle = '#9fd0ff'; ctx.fillText('Tap — wróć na Home', cx, H * 0.62);
   ctx.textAlign = 'left';
 }

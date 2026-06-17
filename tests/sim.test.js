@@ -26,7 +26,7 @@ test('three tough fish that escape end the descent at END', () => {
   const hookX = 200;
   let safety = 0;
   while (s.mode === 'DESCENT' && safety++ < 500) {
-    if (!s.latched) {
+    if (s.latched.length === 0) {
       const hookWorldY = s.depthPx + HOOK_Y;
       s.fish.push({ type: 'twardziel', x: hookX, y: hookWorldY, hp: 9999, hpMax: 9999, window: 2.0, windowLeft: 0, state: 'aggro', dir: 1, bubbleY: 0 });
     }

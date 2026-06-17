@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, placeHook, startStage, addDepth, registerStun, registerEscape,
-  carouselMove, openBackpack, closeBackpack, stageUnlocked,
+  carouselMove, openBackpack, closeBackpack, stageUnlocked, descentCleared,
+  openChest, placeAccessory,
 } from '../src/state.js';
 import { STARTER_HOOK, FISH_TYPES, WORLD, STAGES } from '../src/config.js';
 
@@ -29,10 +30,12 @@ test('backpack open/close toggles mode', () => {
   closeBackpack(s); assert.equal(s.mode, 'HOME');
 });
 
-test('placeHook equips hook and marks progress', () => {
+test('placeHook equips hook (aggregated stats) and marks progress', () => {
   const s = createGame();
   assert.equal(placeHook(s, 1, 1), true);
-  assert.equal(s.hook.id, STARTER_HOOK.id);
+  assert.ok(s.hook);
+  assert.equal(s.hook.maxLatch, 1);
+  assert.equal(s.hook.atk, STARTER_HOOK.atk);
   assert.equal(s.progress.hookEquipped, true);
 });
 
@@ -67,6 +70,41 @@ test('three escapes end the stage; >=1 star unlocks next and saves stars', () =>
   assert.ok(s.progress.stages[0].bestScore >= 300);
   assert.equal(s.progress.stages[1].unlocked, true);
   assert.equal(s.lastResult.newUnlock, true);
+});
+
+test('chest earned only on clear with >=1 star; first chest forces the anchor', () => {
+  const s = createGame(); placeHook(s, 0, 0); startStage(s);
+  s.stunnedPoints = 300; descentCleared(s);
+  assert.equal(s.lastResult.chestEarned, true);
+  assert.equal(s.progress.pendingChests, 1);
+  const reward = openChest(s);
+  assert.equal(reward.anchor, true);
+  assert.ok(s.progress.coins >= 120);
+  assert.equal(s.progress.inventory.anchor, 1);
+  assert.equal(s.progress.pendingChests, 0);
+});
+
+test('placing the anchor raises hook maxLatch to 2', () => {
+  const s = createGame(); placeHook(s, 0, 0);
+  s.progress.inventory.anchor = 1;
+  assert.equal(placeAccessory(s, 'anchor'), true);
+  assert.equal(s.hook.maxLatch, 2);
+});
+
+test('fish award coins from their coins field', () => {
+  const s = createGame(); placeHook(s, 0, 0); startStage(s);
+  registerStun(s, FISH_TYPES.twardziel);
+  assert.equal(s.coinsEarned, FISH_TYPES.twardziel.coins);
+});
+
+test('descentCleared ends the stage as success (cleared) and scores stars', () => {
+  const s = createGame(); placeHook(s, 0, 0); startStage(s);
+  s.stunnedPoints = 300;
+  descentCleared(s);
+  assert.equal(s.mode, 'END');
+  assert.equal(s.lastResult.cleared, true);
+  assert.ok(s.stars >= 1);
+  assert.equal(s.progress.stages[1].unlocked, true);
 });
 
 test('zero-star run does not unlock the next stage', () => {

@@ -7,7 +7,15 @@ export function defaultProgress(stageCount) {
   for (let i = 0; i < stageCount; i++) {
     stages.push({ unlocked: i === 0, bestScore: 0, stars: 0 });
   }
-  return { stages, hookEquipped: false };
+  return {
+    stages,
+    hookEquipped: false,
+    grid: null,          // zapisany układ plecaka (cells) — null = pusty
+    coins: 0,            // soft currency (do mergowania akcesoriów)
+    pendingChests: 0,    // skrzynki do otwarcia na Home
+    gotAnchor: false,    // czy pierwsza (wymuszona) Kotwica już przyznana
+    inventory: {},       // akcesoria posiadane, nieumieszczone: { id: count }
+  };
 }
 
 export function loadProgress(stageCount) {
@@ -22,6 +30,11 @@ export function loadProgress(stageCount) {
             if (data.stages[i]) Object.assign(prog.stages[i], data.stages[i]);
           }
           prog.hookEquipped = !!data.hookEquipped;
+          prog.grid = Array.isArray(data.grid) ? data.grid : null;
+          prog.coins = data.coins || 0;
+          prog.pendingChests = data.pendingChests || 0;
+          prog.gotAnchor = !!data.gotAnchor;
+          prog.inventory = data.inventory || {};
         }
       }
     }

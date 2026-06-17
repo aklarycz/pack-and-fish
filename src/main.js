@@ -1,5 +1,5 @@
 import { WORLD, BACKPACK, layoutWorld } from './config.js';
-import { createGame, placeHook, startStage, carouselMove, openBackpack, closeBackpack, returnHome } from './state.js';
+import { createGame, placeHook, placeAccessory, startStage, carouselMove, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
@@ -35,9 +35,11 @@ function hit(r, x, y) {
 attachInput(canvas, {
   onPointerDown(x, y) {
     if (s.mode === 'HOME') {
+      if (s.chestReveal) { dismissChest(s); return; }  // tap zamyka reveal skrzynki
       const h = s._home;
       if (!h) return;
-      if (hit(h.left, x, y)) carouselMove(s, -1);
+      if (h.chest && hit(h.chest, x, y)) openChest(s);
+      else if (hit(h.left, x, y)) carouselMove(s, -1);
       else if (hit(h.right, x, y)) carouselMove(s, 1);
       else if (hit(h.backpack, x, y)) openBackpack(s);
       else if (hit(h.start, x, y) || hit(h.stage, x, y)) {
@@ -50,6 +52,8 @@ attachInput(canvas, {
         const c = Math.floor((x - gi.ox) / gi.cell);
         const r = Math.floor((y - gi.oy) / gi.cell);
         if (c >= 0 && r >= 0 && c < BACKPACK.cols && r < BACKPACK.rows) placeHook(s, c, r);
+      } else if (s._bpInv) {
+        for (const it of s._bpInv) if (hit(it.rect, x, y)) { placeAccessory(s, it.id); break; }
       }
     } else if (s.mode === 'END') {
       returnHome(s);

@@ -13,9 +13,9 @@ test('pure depth never reaches 1 star (anti dodge-stall)', () => {
   assert.equal(computeStars(computeScore(1000, 0)), 0);
 });
 
-test('stuns add points and unlock stars', () => {
-  // 1000m -> depth capped at 60, + stuns
-  assert.equal(computeScore(1000, 5), SCORE.depthCeil + 5); // wStun=1, scoreValue passed as units
+test('stuns add points (weighted) and dominate score', () => {
+  // 1000m -> depth capped at depthCeil, + stuns * wStun
+  assert.equal(computeScore(1000, 5), SCORE.depthCeil + 5 * SCORE.wStun);
 });
 
 test('computeStars maps thresholds', () => {

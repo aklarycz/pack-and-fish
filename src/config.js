@@ -37,19 +37,37 @@ export function layoutWorld(W, H) {
 export const STARTER_HOOK = {
   id: 'rusty_hook',
   name: 'Zardzewiały hak',
+  kind: 'hook',
   atk: 8,                // dmg/s zadawany zaczepionej rybie
   zwrotnosc: 280,        // px/s dryfu L/P
   szybkoscOpadania: 40,  // px/s opadania (łagodny scroll w górę, by nie przebijał pływania ryb)
+  maxLatch: 1,           // ile ryb naraz hak zaczepia (akcesoria dodają +)
   w: 1, h: 1,
 };
+
+// Akcesoria (plaster 2). Kotwica = "hak z 2 haków": +1 jednoczesny zaczep.
+export const ANCHOR = {
+  id: 'anchor', name: 'Kotwica', kind: 'accessory',
+  maxLatch: 1, w: 1, h: 1, desc: '+1 ryba naraz',
+};
+
+// Rejestr itemów (lookup po id z gridu plecaka).
+export const ITEMS = {
+  [STARTER_HOOK.id]: STARTER_HOOK,
+  [ANCHOR.id]: ANCHOR,
+};
+
+// Nagroda ze skrzynki za ukończenie stage (≥1★). Pierwsza skrzynka wymusza Kotwicę.
+export const CHEST_SC = 120;
 
 // 3 archetypy: jedna oś = HP vs okno. scoreValue liczy się przy ogłuszeniu.
 export const FISH_TYPES = {
   // speed = pozioma prędkość pływania (px/s). Wyższa niż szybkoscOpadania, żeby
   // ruch w bok DOMINOWAŁ nad scrollem opadania → ryby czytają się jak pływające.
-  plotka:    { id: 'plotka',    hp: 6,  window: 2.0, speed: 70,  aggroRange: 130, radius: 16, color: '#7fd1ff', scoreValue: 1 },
-  sredniak:  { id: 'sredniak',  hp: 14, window: 2.2, speed: 85,  aggroRange: 150, radius: 22, color: '#ffd166', scoreValue: 3 },
-  twardziel: { id: 'twardziel', hp: 34, window: 2.0, speed: 100, aggroRange: 170, radius: 30, color: '#ef476f', scoreValue: 6 },
+  // coins (waluta do merge) oddzielone od scoreValue (do score).
+  plotka:    { id: 'plotka',    hp: 6,  window: 2.0, speed: 70,  aggroRange: 130, radius: 16, color: '#7fd1ff', scoreValue: 1, coins: 1 },
+  sredniak:  { id: 'sredniak',  hp: 12, window: 2.6, speed: 85,  aggroRange: 150, radius: 22, color: '#ffd166', scoreValue: 3, coins: 3 },
+  twardziel: { id: 'twardziel', hp: 34, window: 2.0, speed: 100, aggroRange: 170, radius: 30, color: '#ef476f', scoreValue: 6, coins: 8 },
 };
 
 // Rampa wg głębokości (metry). Wartości interpolowane/progowane w ramp.js.
@@ -68,22 +86,36 @@ export const RAMP = {
   ],
 };
 
-// Score: depth ma SUFIT poniżej progu 1★ — bez łapania ryb nie ma gwiazdek (anti dodge-stall).
+// Score: ryby są głównym źródłem (wStun ×10), głębia ma SUFIT poniżej progu 1★
+// (anti dodge-stall). depthCap jest per-stage; depthCeil = fallback.
 export const SCORE = {
   wDepth: 1.0,     // pkt na metr
-  wStun: 1.0,      // mnożnik scoreValue ryby
-  depthCeil: 60,   // maks. wkład samej głębokości
+  wStun: 10.0,     // mnożnik scoreValue ryby (ryby dominują nad głębią)
+  depthCeil: 60,   // domyślny sufit głębi (fallback gdy stage bez depthCap)
 };
 
 // Domyślne progi gwiazdek (fallback). T1 > depthCeil (gwarancja: sama głębia < 1★).
 export const STARS = { t1: 80, t2: 200, t3: 380 };
 
-// Stage'y (plaster 2 — meta). Różnią się trudnością (difficultyOffsetM przesuwa
-// rampę: stage startuje "głębiej") i progami gwiazdek. ≥1★ odblokowuje kolejny.
+// Stage'y (plaster 2 — meta). Balans wg specu ekonomii:
+// - bag = dokładny worek ryb (gwarantuje max score), spawnowany easy->hard;
+// - spawn = krzywa interwału { start, min, perM } dopasowana do maxLatch;
+// - depthCap = sufit wkładu głębi do score; stars = progi (3★ ≈ perfekcja).
+// Stage 1 MUSI być 3★-owalny bazowym hakiem (kotwica jest dopiero z jego skrzyni),
+// dlatego brak twardziela i stały, "łapalny" interwał.
 export const STAGES = [
-  { id: 1, name: 'Przybrzeże', difficultyOffsetM: 0,  stars: { t1: 60,  t2: 140, t3: 240 } },
-  { id: 2, name: 'Rafa',       difficultyOffsetM: 18, stars: { t1: 80,  t2: 170, t3: 290 } },
-  { id: 3, name: 'Głębia',     difficultyOffsetM: 36, stars: { t1: 100, t2: 200, t3: 340 } },
+  { id: 1, name: 'Przybrzeże', difficultyOffsetM: 0,
+    bag: { plotka: 10, sredniak: 6, twardziel: 0 },
+    spawn: { start: 2.3, min: 2.3, perM: 0 },
+    depthCap: 30, stars: { t1: 180, t2: 245, t3: 290 } },
+  { id: 2, name: 'Toń',        difficultyOffsetM: 20,
+    bag: { plotka: 6, sredniak: 10, twardziel: 6 },
+    spawn: { start: 1.6, min: 1.2, perM: 0.01 },
+    depthCap: 45, stars: { t1: 445, t2: 600, t3: 720 } },
+  { id: 3, name: 'Głębia',     difficultyOffsetM: 45,
+    bag: { plotka: 4, sredniak: 12, twardziel: 12 },
+    spawn: { start: 1.3, min: 0.9, perM: 0.012 },
+    depthCap: 60, stars: { t1: 690, t2: 940, t3: 1110 } },
 ];
 
 export const BACKPACK = {
