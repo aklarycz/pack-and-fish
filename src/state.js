@@ -54,6 +54,7 @@ export function createGame() {
     hook: computeHookStats(grid),
     chestReveal: null,    // aktualnie otwierana skrzynka (overlay Home)
     bpDrag: null,         // przeciągany item w plecaku { fromIdx, id, x, y }
+    bpSelected: null,     // akcesorium wybrane do podglądu opisu (id)
     // pola descentu (resetowane w startStage)
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [],
@@ -107,9 +108,13 @@ export function placeAccessory(s, itemId) {
   s.progress.inventory[itemId] -= 1;
   if (s.progress.inventory[itemId] <= 0) delete s.progress.inventory[itemId];
   s.hook = computeHookStats(s.grid);
+  s.bpSelected = null;
   persist(s);
   return true;
 }
+
+// wybór akcesorium do podglądu opisu (nie wkłada — to robi przycisk WŁÓŻ)
+export function selectAccessory(s, id) { s.bpSelected = id; }
 
 // Swobodne przesuwanie w gridzie: przenieś (na puste) lub zamień (swap).
 export function moveItem(s, fromIdx, toIdx) {

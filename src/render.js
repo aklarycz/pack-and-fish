@@ -78,8 +78,8 @@ function drawTutorial(ctx, s) {
         const ai = s.grid.cells.indexOf('anchor'), adj = freeAdjacentToHook(s.grid);
         if (ai >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, ai)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Kotwicę obok haka'; }
       }
-    } else if (s.hook && s.hook.maxLatch >= 2 && s.progress.gotAnchor && !s.progress.tutAnchorDone) {
-      target = { x: W / 2, y: H * 0.52 }; text = 'Połączone! Kotwica daje +1 rybę naraz i +1 atk';
+    } else if (s.hook && s.hook.maxLatch >= 2 && s.progress.gotAnchor && !s.progress.tutAnchorDone && s._backpackBack) {
+      target = rectCenter(s._backpackBack); text = 'Połączone! +1 ryba, +1 atk — Wróć na Home';
     }
   }
   if (!text) return;
@@ -376,16 +376,17 @@ function renderBackpack(ctx, s) {
   ctx.fillStyle = '#e6f0ff'; ctx.font = `bold ${Math.round(H * 0.03)}px sans-serif`; ctx.textAlign = 'center';
   ctx.fillText(s.hook ? 'Plecak' : 'Włóż hak do plecaka', W / 2, H * 0.08);
 
-  const gw = BACKPACK.cols * BACKPACK.cell, gh = BACKPACK.rows * BACKPACK.cell;
-  const ox = (W - gw) / 2, oy = H * 0.13;
+  const bcell = Math.round(Math.min(W * 0.22, H * 0.105)); // responsywne pole (mieści się na telefonie)
+  const gw = BACKPACK.cols * bcell, gh = BACKPACK.rows * bcell;
+  const ox = (W - gw) / 2, oy = H * 0.11;
   for (let r = 0; r < BACKPACK.rows; r++) for (let c = 0; c < BACKPACK.cols; c++) {
-    const cellX = ox + c * BACKPACK.cell, cellY = oy + r * BACKPACK.cell;
-    ctx.strokeStyle = '#2c5a82'; ctx.lineWidth = 2; ctx.strokeRect(cellX, cellY, BACKPACK.cell, BACKPACK.cell);
+    const cellX = ox + c * bcell, cellY = oy + r * bcell;
+    ctx.strokeStyle = '#2c5a82'; ctx.lineWidth = 2; ctx.strokeRect(cellX, cellY, bcell, bcell);
     const idx = r * BACKPACK.cols + c;
     const id = s.grid.cells[idx];
-    if (id && ITEMS[id] && !(s.bpDrag && s.bpDrag.fromIdx === idx)) drawItemCell(ctx, ITEMS[id], cellX, cellY, BACKPACK.cell);
+    if (id && ITEMS[id] && !(s.bpDrag && s.bpDrag.fromIdx === idx)) drawItemCell(ctx, ITEMS[id], cellX, cellY, bcell);
   }
-  s._grid = { ox, oy, cell: BACKPACK.cell };
+  s._grid = { ox, oy, cell: bcell };
 
   // staty haka (efekt ułożenia/adjacency) + hint przeciągania
   if (s.hook) {
@@ -397,6 +398,7 @@ function renderBackpack(ctx, s) {
 
   let y = oy + gh + H * 0.10;
   s._bpInv = [];
+  s._bpPlaceBtn = null;
   if (!s.hook) {
     ctx.fillStyle = '#ffd166'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`; ctx.textAlign = 'center';
     ctx.fillText('Tap pole, by włożyć: ' + STARTER_HOOK.name, W / 2, y);
@@ -405,16 +407,41 @@ function renderBackpack(ctx, s) {
     ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`; ctx.textAlign = 'center';
     ctx.fillText(inv.length ? 'Ekwipunek — tap, by włożyć:' : 'Brak akcesoriów — zdobądź skrzynię na Home', W / 2, y);
     y += H * 0.02;
-    const cell = BACKPACK.cell * 0.9;
+    const cell = bcell * 0.9;
     const rowW = inv.length * cell + (inv.length - 1) * 10;
     inv.forEach(([id, n], k) => {
       const r = { x: W / 2 - rowW / 2 + k * (cell + 10), y, w: cell, h: cell };
       drawItemCell(ctx, ITEMS[id], r.x, r.y, cell);
+      if (id === s.bpSelected) { rrPath(ctx, r.x, r.y, r.w, r.h, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke(); }
       ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(cell * 0.2)}px sans-serif`; ctx.textAlign = 'right';
       ctx.fillText('x' + n, r.x + r.w - 4, r.y + r.h - 6);
       s._bpInv.push({ rect: r, id });
     });
     y += cell + H * 0.03;
+  }
+
+  // panel opisu wybranego akcesorium (po kliknięciu w nie)
+  if (s.bpSelected && ITEMS[s.bpSelected]) {
+    const it = ITEMS[s.bpSelected];
+    const pw = W * 0.88, px = (W - pw) / 2, ph = H * 0.14, py = y;
+    fillRR(ctx, px, py, pw, ph, 10, 'rgba(14,34,51,0.96)');
+    rrPath(ctx, px, py, pw, ph, 10); ctx.strokeStyle = 'rgba(127,209,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(H * 0.024)}px sans-serif`;
+    ctx.fillText(it.name, W / 2, py + H * 0.03);
+    const stats = [];
+    if (it.atk) stats.push('+' + it.atk + ' atk');
+    if (it.maxLatch) stats.push('+' + it.maxLatch + ' ryba naraz');
+    ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.02)}px sans-serif`;
+    ctx.fillText(stats.join('   ·   '), W / 2, py + H * 0.058);
+    ctx.fillStyle = 'rgba(207,226,245,0.75)'; ctx.font = `${Math.round(H * 0.017)}px sans-serif`;
+    ctx.fillText('Odblokowuje się po połączeniu z hakiem (obok)', W / 2, py + H * 0.082);
+    if (s.progress.inventory[s.bpSelected] > 0) {
+      const bw2 = W * 0.42, bh2 = H * 0.045, bx2 = W / 2 - bw2 / 2, by2 = py + ph - bh2 - H * 0.012;
+      roundedBtn(ctx, { x: bx2, y: by2, w: bw2, h: bh2 }, '#2e7d4f', 'WŁÓŻ');
+      s._bpPlaceBtn = { x: bx2, y: by2, w: bw2, h: bh2 };
+    }
+    y = py + ph + H * 0.02;
   }
 
   const bw = Math.round(W * 0.4), bh = Math.round(H * 0.07);
@@ -424,7 +451,7 @@ function renderBackpack(ctx, s) {
 
   // ghost przeciąganego itemu (podąża za palcem)
   if (s.bpDrag && ITEMS[s.bpDrag.id]) {
-    const cs = BACKPACK.cell;
+    const cs = s._grid.cell;
     ctx.globalAlpha = 0.8;
     drawItemCell(ctx, ITEMS[s.bpDrag.id], s.bpDrag.x - cs / 2, s.bpDrag.y - cs / 2, cs);
     ctx.globalAlpha = 1;
