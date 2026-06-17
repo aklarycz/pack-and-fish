@@ -42,10 +42,10 @@ const BG_SURFACE = 'assets/arenas/arena-01-surface.png';
 const FOLIAGE = 'assets/arenas/arena-01-foliage.png';
 const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
 const CAT_FRONT_CAST = 'assets/cat/cat-front-cast.png';
-// sheety klatkowe (jeśli istnieją, mają priorytet nad pozą+tween). Jeden rząd N klatek.
-const CAT_IDLE_SHEET = 'assets/cat/cat-front-idle-sheet-8x1.png';
-const CAT_CAST_SHEET = 'assets/cat/cat-front-cast-sheet-8x1.png';
-const IDLE_FRAMES = 8, CAST_FRAMES = 8;
+// sheety klatkowe w siatce 3x3 (9 klatek; priorytet nad pozą+tween jeśli istnieją).
+const CAT_IDLE_SHEET = 'assets/cat/cat-front-idle-sheet-3x3.png';
+const CAT_CAST_SHEET = 'assets/cat/cat-front-cast-sheet-3x3.png';
+const CAT_COLS = 3, CAT_ROWS = 3, CAT_FRAMES = 9;
 const STAGE_SPRITE = ['assets/stages/stage1.png', 'assets/stages/stage2.png', 'assets/stages/stage3.png'];
 const STAGE_LOCKED = [null, 'assets/stages/stage2_locked.png', 'assets/stages/stage3_locked.png'];
 const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
@@ -226,12 +226,12 @@ function renderHome(ctx, s) {
   ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.46, W * 0.18, H * 0.014, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
-  if (s.cast && castSheet) {                       // klatki: cast
-    const f = Math.min(CAST_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAST_FRAMES));
-    drawSheet(ctx, castSheet, f, CAST_FRAMES, cx, catCy, catH, 0.04);
-  } else if (!s.cast && idleSheet) {               // klatki: idle (pętla)
-    const f = Math.floor(now * 1000 / 120) % IDLE_FRAMES;
-    drawSheet(ctx, idleSheet, f, IDLE_FRAMES, cx, catCy, catH, 0.04);
+  if (s.cast && castSheet) {                       // klatki: cast (siatka 3x3)
+    const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
+    drawSheet(ctx, castSheet, f, CAT_COLS, CAT_ROWS, cx, catCy, catH, 0.04);
+  } else if (!s.cast && idleSheet) {               // klatki: idle (pętla, siatka 3x3)
+    const f = Math.floor(now * 1000 / 130) % CAT_FRAMES;
+    drawSheet(ctx, idleSheet, f, CAT_COLS, CAT_ROWS, cx, catCy, catH, 0.04);
   } else {                                         // fallback: pojedyncza poza + tween z kodu
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
@@ -330,15 +330,17 @@ function drawCover(ctx, im, x, y, w, h) {
   ctx.drawImage(im, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
 }
 
-// rysuje klatkę `frame` z poziomego sprite-sheetu (frames w rzędzie), wyśrodkowaną w (cx,cy)
-// `im` może być <img> lub <canvas> (po keyedSheet). `inset` przycina po bokach klatki,
-// żeby nie wchodził sliver z sąsiedniej klatki (gdy sheet nie jest idealnie równy).
-function drawSheet(ctx, im, frame, frames, cx, cy, targetH, inset = 0) {
+// rysuje klatkę `frame` z sheetu w siatce cols×rows, wyśrodkowaną w (cx,cy).
+// `im` może być <img> lub <canvas> (po keyedSheet). `inset` przycina krawędzie klatki
+// (anti-sliver z sąsiedniej klatki). targetH = docelowa wysokość klatki.
+function drawSheet(ctx, im, frame, cols, rows, cx, cy, targetH, inset = 0) {
   const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
-  const fw = iw / frames, fh = ih, padX = fw * inset;
-  const sx = frame * fw + padX, sw = fw - 2 * padX;
-  const w = sw * (targetH / fh);
-  ctx.drawImage(im, sx, 0, sw, fh, cx - w / 2, cy - targetH / 2, w, targetH);
+  const fw = iw / cols, fh = ih / rows;
+  const col = frame % cols, row = Math.floor(frame / cols) % rows;
+  const padX = fw * inset, padY = fh * inset;
+  const sx = col * fw + padX, sy = row * fh + padY, sw = fw - 2 * padX, sh = fh - 2 * padY;
+  const w = sw * (targetH / sh);
+  ctx.drawImage(im, sx, sy, sw, sh, cx - w / 2, cy - targetH / 2, w, targetH);
 }
 
 // pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
