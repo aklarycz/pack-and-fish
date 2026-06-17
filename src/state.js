@@ -113,8 +113,25 @@ export function placeAccessory(s, itemId) {
   return true;
 }
 
-// wybór akcesorium do podglądu opisu (nie wkłada — to robi przycisk WŁÓŻ)
-export function selectAccessory(s, id) { s.bpSelected = id; }
+// wybór akcesorium z ekwipunku do podglądu (gridIdx=null → przycisk WŁÓŻ)
+export function selectAccessory(s, id) { s.bpSelected = { id, gridIdx: null }; }
+// wybór itemu W gridzie (tap, nie drag) → opis + WYPNIJ (jeśli akcesorium)
+export function selectPlaced(s, gridIdx) {
+  const id = s.grid.cells[gridIdx];
+  if (id && ITEMS[id]) s.bpSelected = { id, gridIdx };
+}
+// wypnij akcesorium z gridu z powrotem do ekwipunku (haka nie wypinamy)
+export function unequipAccessory(s, gridIdx) {
+  const id = s.grid.cells[gridIdx];
+  const it = id && ITEMS[id];
+  if (!it || it.kind === 'hook') return false;
+  s.grid.cells[gridIdx] = null;
+  s.progress.inventory[id] = (s.progress.inventory[id] || 0) + 1;
+  s.hook = computeHookStats(s.grid);
+  s.bpSelected = null;
+  persist(s);
+  return true;
+}
 
 // Swobodne przesuwanie w gridzie: przenieś (na puste) lub zamień (swap).
 export function moveItem(s, fromIdx, toIdx) {

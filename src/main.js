@@ -1,5 +1,5 @@
 import { WORLD, BACKPACK, layoutWorld } from './config.js';
-import { createGame, placeHook, placeAccessory, selectAccessory, moveItem, startStage, carouselMove, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
+import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, carouselMove, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
@@ -55,12 +55,13 @@ attachInput(canvas, {
       }
     } else if (s.mode === 'BACKPACK') {
       if (s._backpackBack && hit(s._backpackBack, x, y)) { closeBackpack(s); return; }
-      if (s._bpPlaceBtn && hit(s._bpPlaceBtn, x, y)) { placeAccessory(s, s.bpSelected); return; }
+      if (s._bpPlaceBtn && hit(s._bpPlaceBtn, x, y)) { placeAccessory(s, s.bpSelected.id); return; }
+      if (s._bpUnequipBtn && hit(s._bpUnequipBtn, x, y)) { unequipAccessory(s, s.bpSelected.gridIdx); return; }
       const cell = cellAt(s._grid, x, y);
       if (!s.hook) {
         if (cell >= 0) placeHook(s, cell % BACKPACK.cols, Math.floor(cell / BACKPACK.cols));
       } else if (cell >= 0 && s.grid.cells[cell]) {
-        s.bpDrag = { fromIdx: cell, id: s.grid.cells[cell], x, y }; // podnieś do przeciągania
+        s.bpDrag = { fromIdx: cell, id: s.grid.cells[cell], x, y, ox: x, oy: y, moved: false }; // tap=opis / drag=przenieś
       } else if (s._bpInv) {
         for (const it of s._bpInv) if (hit(it.rect, x, y)) { selectAccessory(s, it.id); break; } // klik = opis
       }
@@ -72,12 +73,16 @@ attachInput(canvas, {
   },
   onPointerMove(x, y) {
     if (s.mode === 'DESCENT') { hookX = clampHookX(x); hookY = clampHookY(y); }
-    else if (s.mode === 'BACKPACK' && s.bpDrag) { s.bpDrag.x = x; s.bpDrag.y = y; }
+    else if (s.mode === 'BACKPACK' && s.bpDrag) {
+      s.bpDrag.x = x; s.bpDrag.y = y;
+      if (Math.hypot(x - s.bpDrag.ox, y - s.bpDrag.oy) > 10) s.bpDrag.moved = true;
+    }
   },
   onPointerUp(x, y) {
     if (s.mode === 'BACKPACK' && s.bpDrag) {
       const to = cellAt(s._grid, x, y);
-      if (to >= 0) moveItem(s, s.bpDrag.fromIdx, to);
+      if (s.bpDrag.moved && to >= 0 && to !== s.bpDrag.fromIdx) moveItem(s, s.bpDrag.fromIdx, to);
+      else selectPlaced(s, s.bpDrag.fromIdx); // tap (bez przesunięcia) = opis
       s.bpDrag = null;
     }
   },
