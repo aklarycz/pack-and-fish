@@ -38,7 +38,10 @@ const FISH_SPRITE = {
   twardziel: 'assets/fish/twardziel.png',
 };
 const BUBBLE_SRC = 'assets/bubble.png';
-const BG_SURFACE = 'assets/bg-surface.png';
+const BG_SURFACE = 'assets/arenas/arena-01-surface.png';
+const FOLIAGE = 'assets/arenas/arena-01-foliage.png';
+const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
+const CAT_FRONT_CAST = 'assets/cat/cat-front-cast.png';
 const STAGE_SPRITE = ['assets/stages/stage1.png', 'assets/stages/stage2.png', 'assets/stages/stage3.png'];
 const STAGE_LOCKED = [null, 'assets/stages/stage2_locked.png', 'assets/stages/stage3_locked.png'];
 const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
@@ -212,22 +215,29 @@ function renderHome(ctx, s) {
   chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');          // gemy (placeholder)
   chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');    // energia (brak gate'u)
 
-  // bohater Tofu — CENTRALNY; siedzi i przysypia (doze) albo zarzuca (cast) po STARCIE
-  const catCy = H * 0.47, catH = H * 0.30;
-  catRect = { x: cx - W * 0.30, y: catCy - catH / 2, w: W * 0.60, h: catH };
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.46, W * 0.22, H * 0.02, 0, 0, Math.PI * 2); ctx.fill();
-  const catSheet = keyedSheet(s.cast ? CAT_CAST : CAT_DOZE);
-  if (catSheet) {
-    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    let frame;
-    if (s.cast) frame = Math.min(5, Math.floor(s.cast.t / CAST_DUR * 6));
-    else frame = Math.floor(now / 480) % 6; // doze: powolny, oparty na czasie (nie fps)
-    drawSheet(ctx, catSheet, frame, 6, cx, catCy, catH, 0.06);
+  // bohater Tofu — FRONT, na placyku; idle = bujanie+tilt+"Z", cast = pop (animacja z kodu)
+  const catCy = H * 0.585, catH = H * 0.27;
+  catRect = { x: cx - W * 0.28, y: catCy - catH / 2, w: W * 0.56, h: catH };
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.5, W * 0.2, H * 0.016, 0, 0, Math.PI * 2); ctx.fill();
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
+  if (catIm) {
+    let dy = 0, tilt = 0, scale = 1;
+    if (s.cast) { const p = Math.min(1, s.cast.t / CAST_DUR); scale = 1 + 0.08 * Math.sin(p * Math.PI); dy = -H * 0.012 * Math.sin(p * Math.PI); }
+    else { dy = Math.sin(now * 1.6) * H * 0.006; tilt = Math.sin(now * 0.8) * 0.035; }
+    drawImageCentered(ctx, catIm, cx, catCy, catH, { dy, tilt, scale });
+    if (!s.cast) drawDozeZ(ctx, cx + catH * 0.34, catCy - catH * 0.42, now);
+  }
+  // foliage (przednia warstwa) — delikatne kołysanie (shear)
+  const fol = keyedSheet(FOLIAGE);
+  if (fol) {
+    const sway = Math.sin(now * 1.1) * 0.012;
+    ctx.save(); ctx.transform(1, 0, sway, 1, -sway * H * 0.5, 0); drawCover(ctx, fol, 0, 0, W, H); ctx.restore();
   }
 
   // === D: START ===
-  const btnW = W * 0.66, btnH = H * 0.092, bx = cx - btnW / 2, byy = H * 0.715 - btnH / 2;
+  const btnW = W * 0.66, btnH = H * 0.092, bx = cx - btnW / 2, byy = H * 0.80 - btnH / 2;
   const canStart = unlocked && s.hook;
   fillRR(ctx, bx, byy + H * 0.006, btnW, btnH, btnH / 2, 'rgba(0,0,0,0.28)');
   rrPath(ctx, bx, byy, btnW, btnH, btnH / 2);
@@ -241,7 +251,7 @@ function renderHome(ctx, s) {
   const start = { x: bx, y: byy, w: btnW, h: btnH };
   if (!s.hook) {
     ctx.fillStyle = '#ffcb45'; ctx.font = `${Math.round(H * 0.020)}px sans-serif`;
-    ctx.fillText('Zdobądź hak w plecaku, by zacząć', cx, H * 0.788);
+    ctx.fillText('Zdobądź hak w plecaku, by zacząć', cx, byy - H * 0.02);
   }
 
   // === F: tab bar ===
@@ -301,7 +311,7 @@ function renderHome(ctx, s) {
 }
 
 function drawCover(ctx, im, x, y, w, h) {
-  const iw = im.naturalWidth, ih = im.naturalHeight;
+  const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
   const scale = Math.max(w / iw, h / ih);
   const dw = iw * scale, dh = ih * scale;
   ctx.drawImage(im, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
@@ -316,6 +326,30 @@ function drawSheet(ctx, im, frame, frames, cx, cy, targetH, inset = 0) {
   const sx = frame * fw + padX, sw = fw - 2 * padX;
   const w = sw * (targetH / fh);
   ctx.drawImage(im, sx, 0, sw, fh, cx - w / 2, cy - targetH / 2, w, targetH);
+}
+
+// pojedynczy sprite wyśrodkowany, z opcjonalnym przesunięciem/tiltem/skalą (animacja z kodu)
+function drawImageCentered(ctx, im, cx, cy, targetH, opt = {}) {
+  const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+  const sc = (targetH / ih) * (opt.scale || 1);
+  const w = iw * sc, hh = ih * sc;
+  ctx.save();
+  ctx.translate(cx, cy + (opt.dy || 0));
+  if (opt.tilt) ctx.rotate(opt.tilt);
+  ctx.drawImage(im, -w / 2, -hh / 2, w, hh);
+  ctx.restore();
+}
+
+// unoszące się "Z" przy drzemiącym kocie
+function drawDozeZ(ctx, x, y, t) {
+  for (let k = 0; k < 2; k++) {
+    const p = ((t * 0.5 + k * 0.5) % 1);
+    ctx.globalAlpha = (1 - p) * 0.8;
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+    ctx.font = `bold ${Math.round(WORLD.H * (0.022 + k * 0.008))}px sans-serif`;
+    ctx.fillText('z', x + p * WORLD.W * 0.03, y - p * WORLD.H * 0.06);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function rrPath(ctx, x, y, w, h, r) {
