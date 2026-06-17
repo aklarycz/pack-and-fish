@@ -42,6 +42,10 @@ const BG_SURFACE = 'assets/arenas/arena-01-surface.png';
 const FOLIAGE = 'assets/arenas/arena-01-foliage.png';
 const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
 const CAT_FRONT_CAST = 'assets/cat/cat-front-cast.png';
+// sheety klatkowe (jeśli istnieją, mają priorytet nad pozą+tween). Jeden rząd N klatek.
+const CAT_IDLE_SHEET = 'assets/cat/cat-front-idle-sheet-8x1.png';
+const CAT_CAST_SHEET = 'assets/cat/cat-front-cast-sheet-8x1.png';
+const IDLE_FRAMES = 8, CAST_FRAMES = 8;
 const STAGE_SPRITE = ['assets/stages/stage1.png', 'assets/stages/stage2.png', 'assets/stages/stage3.png'];
 const STAGE_LOCKED = [null, 'assets/stages/stage2_locked.png', 'assets/stages/stage3_locked.png'];
 const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
@@ -221,13 +225,22 @@ function renderHome(ctx, s) {
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.46, W * 0.18, H * 0.014, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
-  const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
-  if (catIm) {
-    const opt = {};
-    if (s.cast) { const p = Math.min(1, s.cast.t / CAST_DUR); opt.scale = 1 + 0.1 * Math.sin(p * Math.PI); opt.dy = -H * 0.015 * Math.sin(p * Math.PI); }
-    else { const b = Math.sin(now * 1.8); opt.dy = b * H * 0.012; opt.tilt = Math.sin(now * 0.9) * 0.05; opt.scaleX = 1 - b * 0.03; opt.scaleY = 1 + b * 0.03; }
-    drawImageCentered(ctx, catIm, cx, catCy, catH, opt);
-    if (!s.cast) drawDozeZ(ctx, cx + catH * 0.34, catCy - catH * 0.42, now);
+  const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
+  if (s.cast && castSheet) {                       // klatki: cast
+    const f = Math.min(CAST_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAST_FRAMES));
+    drawSheet(ctx, castSheet, f, CAST_FRAMES, cx, catCy, catH, 0.04);
+  } else if (!s.cast && idleSheet) {               // klatki: idle (pętla)
+    const f = Math.floor(now * 1000 / 120) % IDLE_FRAMES;
+    drawSheet(ctx, idleSheet, f, IDLE_FRAMES, cx, catCy, catH, 0.04);
+  } else {                                         // fallback: pojedyncza poza + tween z kodu
+    const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
+    if (catIm) {
+      const opt = {};
+      if (s.cast) { const p = Math.min(1, s.cast.t / CAST_DUR); opt.scale = 1 + 0.1 * Math.sin(p * Math.PI); opt.dy = -H * 0.015 * Math.sin(p * Math.PI); }
+      else { const b = Math.sin(now * 1.8); opt.dy = b * H * 0.012; opt.tilt = Math.sin(now * 0.9) * 0.05; opt.scaleX = 1 - b * 0.03; opt.scaleY = 1 + b * 0.03; }
+      drawImageCentered(ctx, catIm, cx, catCy, catH, opt);
+      if (!s.cast) drawDozeZ(ctx, cx + catH * 0.34, catCy - catH * 0.42, now);
+    }
   }
   // foliage (przednia warstwa) — kołysanie na wietrze (shear, dół rusza się najmocniej)
   const fol = keyedSheet(FOLIAGE);
