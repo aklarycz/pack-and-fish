@@ -219,10 +219,11 @@ function renderHome(ctx, s) {
   ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.46, W * 0.22, H * 0.02, 0, 0, Math.PI * 2); ctx.fill();
   const catSheet = keyedSheet(s.cast ? CAT_CAST : CAT_DOZE);
   if (catSheet) {
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     let frame;
     if (s.cast) frame = Math.min(5, Math.floor(s.cast.t / CAST_DUR * 6));
-    else { _homeFrame++; frame = Math.floor(_homeFrame / 12) % 6; }
-    drawSheet(ctx, catSheet, frame, 6, cx, catCy, catH);
+    else frame = Math.floor(now / 480) % 6; // doze: powolny, oparty na czasie (nie fps)
+    drawSheet(ctx, catSheet, frame, 6, cx, catCy, catH, 0.06);
   }
 
   // === D: START ===
@@ -307,12 +308,14 @@ function drawCover(ctx, im, x, y, w, h) {
 }
 
 // rysuje klatkę `frame` z poziomego sprite-sheetu (frames w rzędzie), wyśrodkowaną w (cx,cy)
-// `im` może być <img> lub <canvas> (po keyedSheet), stąd fallback width/height.
-function drawSheet(ctx, im, frame, frames, cx, cy, targetH) {
+// `im` może być <img> lub <canvas> (po keyedSheet). `inset` przycina po bokach klatki,
+// żeby nie wchodził sliver z sąsiedniej klatki (gdy sheet nie jest idealnie równy).
+function drawSheet(ctx, im, frame, frames, cx, cy, targetH, inset = 0) {
   const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
-  const fw = iw / frames, fh = ih;
-  const w = fw * (targetH / fh);
-  ctx.drawImage(im, frame * fw, 0, fw, fh, cx - w / 2, cy - targetH / 2, w, targetH);
+  const fw = iw / frames, fh = ih, padX = fw * inset;
+  const sx = frame * fw + padX, sw = fw - 2 * padX;
+  const w = sw * (targetH / fh);
+  ctx.drawImage(im, sx, 0, sw, fh, cx - w / 2, cy - targetH / 2, w, targetH);
 }
 
 function rrPath(ctx, x, y, w, h, r) {
