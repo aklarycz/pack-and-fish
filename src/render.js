@@ -215,25 +215,25 @@ function renderHome(ctx, s) {
   chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');          // gemy (placeholder)
   chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');    // energia (brak gate'u)
 
-  // bohater Tofu — FRONT, na placyku; idle = bujanie+tilt+"Z", cast = pop (animacja z kodu)
-  const catCy = H * 0.585, catH = H * 0.27;
+  // bohater Tofu — FRONT, na placyku; idle = bujanie+tilt+oddech+"Z", cast = pop (anim z kodu)
+  const catCy = H * 0.66, catH = H * 0.26;
   catRect = { x: cx - W * 0.28, y: catCy - catH / 2, w: W * 0.56, h: catH };
-  ctx.fillStyle = 'rgba(0,0,0,0.16)';
-  ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.5, W * 0.2, H * 0.016, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.46, W * 0.18, H * 0.014, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
   if (catIm) {
-    let dy = 0, tilt = 0, scale = 1;
-    if (s.cast) { const p = Math.min(1, s.cast.t / CAST_DUR); scale = 1 + 0.08 * Math.sin(p * Math.PI); dy = -H * 0.012 * Math.sin(p * Math.PI); }
-    else { dy = Math.sin(now * 1.6) * H * 0.006; tilt = Math.sin(now * 0.8) * 0.035; }
-    drawImageCentered(ctx, catIm, cx, catCy, catH, { dy, tilt, scale });
+    const opt = {};
+    if (s.cast) { const p = Math.min(1, s.cast.t / CAST_DUR); opt.scale = 1 + 0.1 * Math.sin(p * Math.PI); opt.dy = -H * 0.015 * Math.sin(p * Math.PI); }
+    else { const b = Math.sin(now * 1.8); opt.dy = b * H * 0.012; opt.tilt = Math.sin(now * 0.9) * 0.05; opt.scaleX = 1 - b * 0.03; opt.scaleY = 1 + b * 0.03; }
+    drawImageCentered(ctx, catIm, cx, catCy, catH, opt);
     if (!s.cast) drawDozeZ(ctx, cx + catH * 0.34, catCy - catH * 0.42, now);
   }
-  // foliage (przednia warstwa) — delikatne kołysanie (shear)
+  // foliage (przednia warstwa) — kołysanie na wietrze (shear, dół rusza się najmocniej)
   const fol = keyedSheet(FOLIAGE);
   if (fol) {
-    const sway = Math.sin(now * 1.1) * 0.012;
-    ctx.save(); ctx.transform(1, 0, sway, 1, -sway * H * 0.5, 0); drawCover(ctx, fol, 0, 0, W, H); ctx.restore();
+    const sway = Math.sin(now * 1.4) * 0.03;
+    ctx.save(); ctx.transform(1, 0, sway, 1, -sway * H, 0); drawCover(ctx, fol, 0, 0, W, H); ctx.restore();
   }
 
   // === D: START ===
@@ -328,11 +328,12 @@ function drawSheet(ctx, im, frame, frames, cx, cy, targetH, inset = 0) {
   ctx.drawImage(im, sx, 0, sw, fh, cx - w / 2, cy - targetH / 2, w, targetH);
 }
 
-// pojedynczy sprite wyśrodkowany, z opcjonalnym przesunięciem/tiltem/skalą (animacja z kodu)
+// pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
 function drawImageCentered(ctx, im, cx, cy, targetH, opt = {}) {
   const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
-  const sc = (targetH / ih) * (opt.scale || 1);
-  const w = iw * sc, hh = ih * sc;
+  const base = targetH / ih;
+  const scx = base * (opt.scaleX || opt.scale || 1), scy = base * (opt.scaleY || opt.scale || 1);
+  const w = iw * scx, hh = ih * scy;
   ctx.save();
   ctx.translate(cx, cy + (opt.dy || 0));
   if (opt.tilt) ctx.rotate(opt.tilt);
