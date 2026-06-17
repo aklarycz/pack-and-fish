@@ -5,7 +5,7 @@ const KEY = 'packfish_progress_v1';
 export function defaultProgress(stageCount) {
   const stages = [];
   for (let i = 0; i < stageCount; i++) {
-    stages.push({ unlocked: i === 0, bestScore: 0, stars: 0 });
+    stages.push({ unlocked: i === 0, bestScore: 0, stars: 0, chestClaimed: false });
   }
   return {
     stages,

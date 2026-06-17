@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createGame, placeHook, startStage, addDepth, registerStun, registerEscape,
   carouselMove, openBackpack, closeBackpack, stageUnlocked, descentCleared,
-  openChest, placeAccessory,
+  openChest, placeAccessory, moveItem, computeHookStats,
 } from '../src/state.js';
 import { STARTER_HOOK, FISH_TYPES, WORLD, STAGES } from '../src/config.js';
 
@@ -84,11 +84,21 @@ test('chest earned only on clear with >=1 star; first chest forces the anchor', 
   assert.equal(s.progress.pendingChests, 0);
 });
 
-test('placing the anchor raises hook maxLatch to 2', () => {
+test('placing the anchor (adjacent) raises hook maxLatch to 2', () => {
   const s = createGame(); placeHook(s, 0, 0);
   s.progress.inventory.anchor = 1;
-  assert.equal(placeAccessory(s, 'anchor'), true);
+  assert.equal(placeAccessory(s, 'anchor'), true); // auto first free = index 1, adjacent
   assert.equal(s.hook.maxLatch, 2);
+});
+
+test('accessory gives effect only when connected to hook (adjacency)', () => {
+  const s = createGame(); placeHook(s, 0, 0); // hook at index 0
+  s.grid.cells[8] = 'anchor'; s.hook = computeHookStats(s.grid); // far corner, not connected
+  assert.equal(s.hook.maxLatch, 1);
+  assert.equal(s.hook.atk, STARTER_HOOK.atk);
+  moveItem(s, 8, 1);                                              // connect to hook
+  assert.equal(s.hook.maxLatch, 2);
+  assert.equal(s.hook.atk, STARTER_HOOK.atk + 1);                 // anchor +1 atk when connected
 });
 
 test('fish award coins from their coins field', () => {

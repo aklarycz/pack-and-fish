@@ -3,24 +3,40 @@ import { createGrid, placeItem } from './logic/backpack.js';
 import { computeScore, computeStars } from './logic/scoring.js';
 import { loadProgress, saveProgress } from './persistence.js';
 
-// Staty haka = agregacja itemów w gridzie (hak bazowy + akcesoria). null = brak haka.
+// Staty haka = hak bazowy + akcesoria POŁĄCZONE z hakiem (adjacency: spójny
+// komponent ortogonalny zawierający hak). Akcesoria odłączone NIE dają efektu.
+// null = brak haka w plecaku.
 export function computeHookStats(grid) {
-  let hookItem = null; const acc = [];
-  for (const id of grid.cells) {
-    if (!id) continue;
-    const it = ITEMS[id]; if (!it) continue;
-    if (it.kind === 'hook') hookItem = it; else acc.push(it);
+  const { cells, cols, rows } = grid;
+  let hookIdx = -1;
+  for (let i = 0; i < cells.length; i++) {
+    const it = cells[i] && ITEMS[cells[i]];
+    if (it && it.kind === 'hook') { hookIdx = i; break; }
   }
-  if (!hookItem) return null;
+  if (hookIdx < 0) return null;
+  // flood-fill po zajętych, ortogonalnie sąsiednich polach od haka
+  const seen = new Set([hookIdx]); const stack = [hookIdx];
+  while (stack.length) {
+    const idx = stack.pop(), r = Math.floor(idx / cols), c = idx % cols;
+    const nb = [];
+    if (r > 0) nb.push(idx - cols);
+    if (r < rows - 1) nb.push(idx + cols);
+    if (c > 0) nb.push(idx - 1);
+    if (c < cols - 1) nb.push(idx + 1);
+    for (const n of nb) if (!seen.has(n) && cells[n]) { seen.add(n); stack.push(n); }
+  }
+  const hook = ITEMS[cells[hookIdx]];
   const stats = {
-    atk: hookItem.atk, zwrotnosc: hookItem.zwrotnosc,
-    szybkoscOpadania: hookItem.szybkoscOpadania, maxLatch: hookItem.maxLatch,
+    atk: hook.atk, zwrotnosc: hook.zwrotnosc,
+    szybkoscOpadania: hook.szybkoscOpadania, maxLatch: hook.maxLatch,
   };
-  for (const a of acc) {
-    stats.atk += a.atk || 0;
-    stats.zwrotnosc += a.zwrotnosc || 0;
-    stats.szybkoscOpadania += a.szybkoscOpadania || 0;
-    stats.maxLatch += a.maxLatch || 0;
+  for (const idx of seen) {
+    if (idx === hookIdx) continue;
+    const it = ITEMS[cells[idx]]; if (!it) continue;
+    stats.atk += it.atk || 0;
+    stats.zwrotnosc += it.zwrotnosc || 0;
+    stats.szybkoscOpadania += it.szybkoscOpadania || 0;
+    stats.maxLatch += it.maxLatch || 0;
   }
   return stats;
 }
@@ -37,6 +53,7 @@ export function createGame() {
     grid,
     hook: computeHookStats(grid),
     chestReveal: null,    // aktualnie otwierana skrzynka (overlay Home)
+    bpDrag: null,         // przeciągany item w plecaku { fromIdx, id, x, y }
     // pola descentu (resetowane w startStage)
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [],
@@ -83,6 +100,19 @@ export function placeAccessory(s, itemId) {
   s.grid.cells[idx] = itemId;
   s.progress.inventory[itemId] -= 1;
   if (s.progress.inventory[itemId] <= 0) delete s.progress.inventory[itemId];
+  s.hook = computeHookStats(s.grid);
+  persist(s);
+  return true;
+}
+
+// Swobodne przesuwanie w gridzie: przenieś (na puste) lub zamień (swap).
+export function moveItem(s, fromIdx, toIdx) {
+  const cells = s.grid.cells;
+  if (fromIdx === toIdx || !cells[fromIdx]) return false;
+  if (toIdx < 0 || toIdx >= cells.length) return false;
+  const tmp = cells[toIdx];
+  cells[toIdx] = cells[fromIdx];
+  cells[fromIdx] = tmp;
   s.hook = computeHookStats(s.grid);
   persist(s);
   return true;
@@ -162,8 +192,10 @@ function finishDescent(s, reason = 'fail') {
     s.progress.stages[next].unlocked = true;
     newUnlock = true;
   }
-  let chestEarned = false;                 // skrzynka tylko za WYCZYSZCZENIE z ≥1★
-  if (reason === 'cleared' && s.stars >= 1) { s.progress.pendingChests += 1; chestEarned = true; }
+  let chestEarned = false;                 // skrzynka JEDNORAZOWA: clear z ≥1★, raz na stage
+  if (reason === 'cleared' && s.stars >= 1 && !st.chestClaimed) {
+    s.progress.pendingChests += 1; st.chestClaimed = true; chestEarned = true;
+  }
   saveProgress(s.progress);
   s.lastResult = {
     stars: s.stars, score: s.score, stunned: s.stunned, coins: s.coinsEarned,

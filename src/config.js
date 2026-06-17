@@ -45,10 +45,11 @@ export const STARTER_HOOK = {
   w: 1, h: 1,
 };
 
-// Akcesoria (plaster 2). Kotwica = "hak z 2 haków": +1 jednoczesny zaczep.
+// Akcesoria (plaster 2). Efekt liczy się TYLKO gdy połączone (adjacency) z hakiem.
+// Kotwica = "hak z 2 haków": +1 jednoczesny zaczep oraz +1 atk (raw, jak hak).
 export const ANCHOR = {
   id: 'anchor', name: 'Kotwica', kind: 'accessory',
-  maxLatch: 1, w: 1, h: 1, desc: '+1 ryba naraz',
+  maxLatch: 1, atk: 1, w: 1, h: 1, desc: '+1 ryba naraz, +1 atk (połącz z hakiem)',
 };
 
 // Rejestr itemów (lookup po id z gridu plecaka).
@@ -65,9 +66,10 @@ export const FISH_TYPES = {
   // speed = pozioma prędkość pływania (px/s). Wyższa niż szybkoscOpadania, żeby
   // ruch w bok DOMINOWAŁ nad scrollem opadania → ryby czytają się jak pływające.
   // coins (waluta do merge) oddzielone od scoreValue (do score).
-  plotka:    { id: 'plotka',    hp: 6,  window: 2.0, speed: 70,  aggroRange: 130, radius: 16, color: '#7fd1ff', scoreValue: 1, coins: 1 },
-  sredniak:  { id: 'sredniak',  hp: 12, window: 2.6, speed: 85,  aggroRange: 150, radius: 22, color: '#ffd166', scoreValue: 3, coins: 3 },
-  twardziel: { id: 'twardziel', hp: 34, window: 2.0, speed: 100, aggroRange: 170, radius: 30, color: '#ef476f', scoreValue: 6, coins: 8 },
+  // okna szersze (łapanie z zapasem, nie "na styk"); radius +30% (większe ryby).
+  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 70,  aggroRange: 130, radius: 21, color: '#7fd1ff', scoreValue: 1, coins: 1 },
+  sredniak:  { id: 'sredniak',  hp: 12, window: 3.4, speed: 85,  aggroRange: 150, radius: 29, color: '#ffd166', scoreValue: 3, coins: 3 },
+  twardziel: { id: 'twardziel', hp: 34, window: 2.4, speed: 100, aggroRange: 170, radius: 39, color: '#ef476f', scoreValue: 6, coins: 8 },
 };
 
 // Rampa wg głębokości (metry). Wartości interpolowane/progowane w ramp.js.

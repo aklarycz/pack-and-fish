@@ -292,12 +292,21 @@ function renderBackpack(ctx, s) {
   for (let r = 0; r < BACKPACK.rows; r++) for (let c = 0; c < BACKPACK.cols; c++) {
     const cellX = ox + c * BACKPACK.cell, cellY = oy + r * BACKPACK.cell;
     ctx.strokeStyle = '#2c5a82'; ctx.lineWidth = 2; ctx.strokeRect(cellX, cellY, BACKPACK.cell, BACKPACK.cell);
-    const id = s.grid.cells[r * BACKPACK.cols + c];
-    if (id && ITEMS[id]) drawItemCell(ctx, ITEMS[id], cellX, cellY, BACKPACK.cell);
+    const idx = r * BACKPACK.cols + c;
+    const id = s.grid.cells[idx];
+    if (id && ITEMS[id] && !(s.bpDrag && s.bpDrag.fromIdx === idx)) drawItemCell(ctx, ITEMS[id], cellX, cellY, BACKPACK.cell);
   }
   s._grid = { ox, oy, cell: BACKPACK.cell };
 
-  let y = oy + gh + H * 0.045;
+  // staty haka (efekt ułożenia/adjacency) + hint przeciągania
+  if (s.hook) {
+    ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText(`Hak: ${s.hook.atk} atk · łapie ${s.hook.maxLatch} naraz`, W / 2, oy + gh + H * 0.04);
+    ctx.fillStyle = 'rgba(207,226,245,0.6)'; ctx.font = `${Math.round(H * 0.017)}px sans-serif`;
+    ctx.fillText('Przeciągnij itemy — połącz Kotwicę z hakiem', W / 2, oy + gh + H * 0.065);
+  }
+
+  let y = oy + gh + H * 0.10;
   s._bpInv = [];
   if (!s.hook) {
     ctx.fillStyle = '#ffd166'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`; ctx.textAlign = 'center';
@@ -323,6 +332,14 @@ function renderBackpack(ctx, s) {
   const back = { x: W / 2 - bw / 2, y: Math.min(y, H - bh - H * 0.04), w: bw, h: bh };
   roundedBtn(ctx, back, '#2e7d4f', s.hook ? 'WRÓĆ NA HOME' : 'WRÓĆ');
   s._backpackBack = back;
+
+  // ghost przeciąganego itemu (podąża za palcem)
+  if (s.bpDrag && ITEMS[s.bpDrag.id]) {
+    const cs = BACKPACK.cell;
+    ctx.globalAlpha = 0.8;
+    drawItemCell(ctx, ITEMS[s.bpDrag.id], s.bpDrag.x - cs / 2, s.bpDrag.y - cs / 2, cs);
+    ctx.globalAlpha = 1;
+  }
   ctx.textAlign = 'left';
 }
 

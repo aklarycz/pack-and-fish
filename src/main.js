@@ -1,5 +1,5 @@
 import { WORLD, BACKPACK, layoutWorld } from './config.js';
-import { createGame, placeHook, placeAccessory, startStage, carouselMove, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
+import { createGame, placeHook, placeAccessory, moveItem, startStage, carouselMove, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
@@ -13,7 +13,7 @@ let hookY = 0;
 
 // Dopasuj canvas do okna (portret 3:4) i przelicz layout — niezależnie od rozdzielczości.
 function fitCanvas() {
-  const aspect = 3 / 4; // szer:wys
+  const aspect = 9 / 16; // szer:wys — proporcje telefonu (węższy, wyższy)
   let h = window.innerHeight;
   let w = Math.round(h * aspect);
   if (w > window.innerWidth) { w = window.innerWidth; h = Math.round(w / aspect); }
@@ -32,6 +32,14 @@ function hit(r, x, y) {
   return r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
 
+// indeks pola plecaka pod (x,y) lub -1
+function cellAt(gi, x, y) {
+  if (!gi) return -1;
+  const c = Math.floor((x - gi.ox) / gi.cell), r = Math.floor((y - gi.oy) / gi.cell);
+  if (c < 0 || r < 0 || c >= BACKPACK.cols || r >= BACKPACK.rows) return -1;
+  return r * BACKPACK.cols + c;
+}
+
 attachInput(canvas, {
   onPointerDown(x, y) {
     if (s.mode === 'HOME') {
@@ -47,11 +55,11 @@ attachInput(canvas, {
       }
     } else if (s.mode === 'BACKPACK') {
       if (s._backpackBack && hit(s._backpackBack, x, y)) { closeBackpack(s); return; }
-      const gi = s._grid;
-      if (!s.hook && gi) {
-        const c = Math.floor((x - gi.ox) / gi.cell);
-        const r = Math.floor((y - gi.oy) / gi.cell);
-        if (c >= 0 && r >= 0 && c < BACKPACK.cols && r < BACKPACK.rows) placeHook(s, c, r);
+      const cell = cellAt(s._grid, x, y);
+      if (!s.hook) {
+        if (cell >= 0) placeHook(s, cell % BACKPACK.cols, Math.floor(cell / BACKPACK.cols));
+      } else if (cell >= 0 && s.grid.cells[cell]) {
+        s.bpDrag = { fromIdx: cell, id: s.grid.cells[cell], x, y }; // podnieś do przeciągania
       } else if (s._bpInv) {
         for (const it of s._bpInv) if (hit(it.rect, x, y)) { placeAccessory(s, it.id); break; }
       }
@@ -61,8 +69,17 @@ attachInput(canvas, {
       hookX = clampHookX(x); hookY = clampHookY(y);
     }
   },
-  onPointerMove(x, y) { if (s.mode === 'DESCENT') { hookX = clampHookX(x); hookY = clampHookY(y); } },
-  onPointerUp() {},
+  onPointerMove(x, y) {
+    if (s.mode === 'DESCENT') { hookX = clampHookX(x); hookY = clampHookY(y); }
+    else if (s.mode === 'BACKPACK' && s.bpDrag) { s.bpDrag.x = x; s.bpDrag.y = y; }
+  },
+  onPointerUp(x, y) {
+    if (s.mode === 'BACKPACK' && s.bpDrag) {
+      const to = cellAt(s._grid, x, y);
+      if (to >= 0) moveItem(s, s.bpDrag.fromIdx, to);
+      s.bpDrag = null;
+    }
+  },
 });
 
 let last = 0;
