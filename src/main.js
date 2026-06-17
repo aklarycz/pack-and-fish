@@ -1,5 +1,5 @@
-import { WORLD, BACKPACK, layoutWorld } from './config.js';
-import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, carouselMove, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
+import { WORLD, BACKPACK, layoutWorld, CAST_DUR } from './config.js';
+import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
@@ -51,7 +51,7 @@ attachInput(canvas, {
       else if (hit(h.right, x, y)) carouselMove(s, 1);
       else if (hit(h.backpack, x, y)) openBackpack(s);
       else if (hit(h.start, x, y) || hit(h.stage, x, y)) {
-        if (startStage(s)) { hookX = WORLD.W / 2; hookY = WORLD.hookStartY; } // startStage sam sprawdza hak/odblokowanie
+        if (!s.cast && s.hook && stageUnlocked(s)) s.cast = { t: 0 }; // zarzut -> potem descent
       }
     } else if (s.mode === 'BACKPACK') {
       if (s._backpackBack && hit(s._backpackBack, x, y)) { closeBackpack(s); return; }
@@ -92,6 +92,10 @@ let last = 0;
 function loop(ts) {
   const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0;
   last = ts;
+  if (s.cast) {
+    s.cast.t += dt;
+    if (s.cast.t >= CAST_DUR) { s.cast = null; if (startStage(s)) { hookX = WORLD.W / 2; hookY = WORLD.hookStartY; } }
+  }
   stepDescent(s, hookX, hookY, dt);
   render(ctx, s, hookX, hookY);
   requestAnimationFrame(loop);

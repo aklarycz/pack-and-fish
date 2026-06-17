@@ -53,6 +53,7 @@ export function createGame() {
     grid,
     hook: computeHookStats(grid),
     chestReveal: null,    // aktualnie otwierana skrzynka (overlay Home)
+    cast: null,           // animacja zarzutu po STARCIE { t } przed zejściem pod wodę
     bpDrag: null,         // przeciągany item w plecaku { fromIdx, id, x, y }
     bpSelected: null,     // akcesorium wybrane do podglądu opisu (id)
     // pola descentu (resetowane w startStage)
@@ -88,7 +89,7 @@ export function closeBackpack(s) {
     s.progress.tutAnchorDone = true; saveProgress(s.progress);  // zobaczył komunikat o połączeniu
   }
 }
-export function returnHome(s) { s.mode = 'HOME'; }
+export function returnHome(s) { s.mode = 'HOME'; s.cast = null; }
 
 // --- plecak: hak (tutorial) + akcesoria ---
 export function placeHook(s, col, row) {

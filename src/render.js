@@ -1,4 +1,4 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR } from './config.js';
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
@@ -9,6 +9,29 @@ function img(src) {
   return im;
 }
 function ready(im) { return im && im.complete && im.naturalWidth > 0; }
+
+// Niektóre assety z GPT mają wypalone tło (białe/checker, bez alpha). Usuwamy je
+// flood-fillem od krawędzi: kasujemy jasne piksele połączone z brzegiem, zatrzymując
+// się na ciemnym outline — więc wnętrze (np. biały brzuszek kota) zostaje. Cache.
+const _keyed = {};
+function keyedSheet(src) {
+  const im = img(src);
+  if (!ready(im)) return null;
+  if (_keyed[src]) return _keyed[src];
+  const w = im.naturalWidth, h = im.naturalHeight;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const cc = c.getContext('2d'); cc.drawImage(im, 0, 0);
+  let id; try { id = cc.getImageData(0, 0, w, h); } catch (e) { _keyed[src] = im; return im; }
+  if (id.data[3] < 10) { _keyed[src] = im; return im; } // już ma alfę
+  const d = id.data, seen = new Uint8Array(w * h), st = [];
+  const lum = (p) => 0.299 * d[p * 4] + 0.587 * d[p * 4 + 1] + 0.114 * d[p * 4 + 2];
+  const push = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const p = y * w + x; if (seen[p] || lum(p) < 170) return; seen[p] = 1; st.push(p); };
+  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+  for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+  while (st.length) { const p = st.pop(); d[p * 4 + 3] = 0; const x = p % w, y = (p / w) | 0; push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1); }
+  cc.putImageData(id, 0, 0);
+  _keyed[src] = c; return c;
+}
 const FISH_SPRITE = {
   plotka: 'assets/fish/plotka.png',
   sredniak: 'assets/fish/sredniak.png',
@@ -18,6 +41,9 @@ const BUBBLE_SRC = 'assets/bubble.png';
 const BG_SURFACE = 'assets/bg-surface.png';
 const STAGE_SPRITE = ['assets/stages/stage1.png', 'assets/stages/stage2.png', 'assets/stages/stage3.png'];
 const STAGE_LOCKED = [null, 'assets/stages/stage2_locked.png', 'assets/stages/stage3_locked.png'];
+const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
+const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
+let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
@@ -134,6 +160,7 @@ function renderHome(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
   const i = s.stageIndex, prog = s.progress.stages[i], unlocked = prog.unlocked;
   const cx = W / 2;
+  let homeLeft, homeRight, catRect; // rect-y do hit-testu (wybór stage + kot)
 
   // 1. tło (pełnoekranowy PNG) 2. vignette 3/4. scrimy
   ctx.fillStyle = '#0b1f33'; ctx.fillRect(0, 0, W, H);
@@ -149,50 +176,24 @@ function renderHome(ctx, s) {
   g.addColorStop(0, 'rgba(6,18,28,0)'); g.addColorStop(1, 'rgba(6,18,28,0.85)');
   ctx.fillStyle = g; ctx.fillRect(0, H * 0.80, W, H * 0.2);
 
-  // === C: scena / karuzela ===
-  const cyArt = H * 0.43, S = W * 0.62, ax = cx - S / 2, ay = cyArt - S / 2;
-  for (let e = 0; e < 3; e++) {
-    ctx.fillStyle = `rgba(0,0,0,${0.12 - e * 0.035})`;
-    ctx.beginPath(); ctx.ellipse(cx, cyArt + S * 0.46, W * 0.25 - e * 6, H * 0.025 - e * 2, 0, 0, Math.PI * 2); ctx.fill();
-  }
-  const src = unlocked ? STAGE_SPRITE[i] : (STAGE_LOCKED[i] || STAGE_SPRITE[i]);
-  const im = img(src);
-  if (ready(im)) ctx.drawImage(im, ax, ay, S, S);
-  else { ctx.fillStyle = unlocked ? '#2e6f9e' : '#3a3f46'; ctx.fillRect(ax, ay, S, S); }
-  if (!unlocked) {
-    ctx.fillStyle = 'rgba(10,22,32,0.62)'; ctx.fillRect(ax, ay, S, S);
-    ctx.beginPath(); ctx.arc(cx, H * 0.40, W * 0.06, 0, Math.PI * 2); ctx.fillStyle = 'rgba(10,22,32,0.7)'; ctx.fill();
-    drawLock(ctx, cx, H * 0.40, W * 0.045);
-    fillRR(ctx, cx - W * 0.21, H * 0.50 - H * 0.025, W * 0.42, H * 0.05, H * 0.025, 'rgba(10,22,32,0.6)');
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(H * 0.026)}px sans-serif`;
-    ctx.fillText('ZABLOKOWANE', cx, H * 0.50 + H * 0.009);
-  }
-  navArrow(ctx, W * 0.085, cyArt, W * 0.055, -1, i > 0);
-  navArrow(ctx, W * 0.915, cyArt, W * 0.055, 1, i < STAGES.length - 1);
-  // kropki paginacji
-  const dotY = H * 0.61, gap = W * 0.022, totalW = (STAGES.length - 1) * gap;
-  for (let k = 0; k < STAGES.length; k++) {
-    const dx = cx - totalW / 2 + k * gap;
-    if (k === i) fillRR(ctx, dx - H * 0.012, dotY - H * 0.006, H * 0.024, H * 0.012, H * 0.006, '#ffcb45');
-    else { ctx.beginPath(); ctx.arc(dx, dotY, H * 0.008, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill(); }
-  }
-
-  // === B: nagłówek stage (shelf + teksty + gwiazdki) ===
-  g = ctx.createLinearGradient(0, H * 0.10, 0, H * 0.20);
-  g.addColorStop(0, 'rgba(10,22,32,0)'); g.addColorStop(1, 'rgba(10,22,32,0.35)');
-  ctx.fillStyle = g; ctx.fillRect(W * 0.05, H * 0.10, W * 0.9, H * 0.10);
+  // === Stage select — kompaktowy pasek u góry (wyspy-ikony przeniesione na mapę aren) ===
+  g = ctx.createLinearGradient(0, H * 0.095, 0, H * 0.215);
+  g.addColorStop(0, 'rgba(10,22,32,0)'); g.addColorStop(1, 'rgba(10,22,32,0.4)');
+  ctx.fillStyle = g; ctx.fillRect(0, H * 0.095, W, H * 0.12);
+  const ar = W * 0.05, arCy = H * 0.135;
+  homeLeft = { x: W * 0.04, y: arCy - ar, w: ar * 2, h: ar * 2 };
+  homeRight = { x: W - W * 0.04 - ar * 2, y: arCy - ar, w: ar * 2, h: ar * 2 };
+  navArrow(ctx, homeLeft.x + ar, arCy, ar, -1, i > 0);
+  navArrow(ctx, homeRight.x + ar, arCy, ar, 1, i < STAGES.length - 1);
   ctx.textAlign = 'center';
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = H * 0.0025;
-  ctx.fillStyle = '#fff'; ctx.font = `900 ${Math.round(H * 0.040)}px sans-serif`;
-  ctx.fillText(`${STAGES[i].id}. ${STAGES[i].name}`, cx, H * 0.13);
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = H * 0.002;
+  ctx.fillStyle = '#fff'; ctx.font = `900 ${Math.round(H * 0.034)}px sans-serif`;
+  ctx.fillText(`${STAGES[i].id}. ${STAGES[i].name}`, cx, H * 0.142);
   ctx.restore();
-  ctx.fillStyle = '#c8d4de'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`;
-  ctx.fillText('Best: ' + prog.bestScore + ' pkt', cx, H * 0.158);
-  const starR = W * 0.025, sgap = W * 0.012, sw = starR * 2, starsW = 3 * sw + 2 * sgap;
-  for (let k = 0; k < 3; k++) {
-    const sx = cx - starsW / 2 + sw / 2 + k * (sw + sgap);
-    star(ctx, sx, H * 0.182, starR * (k === 1 ? 1.1 : 1), k < prog.stars);
-  }
+  const starR = W * 0.022, sgap = W * 0.012, sw = starR * 2, starsW = 3 * sw + 2 * sgap;
+  for (let k = 0; k < 3; k++) star(ctx, cx - starsW / 2 + sw / 2 + k * (sw + sgap), H * 0.172, starR * (k === 1 ? 1.1 : 1), k < prog.stars);
+  ctx.fillStyle = unlocked ? '#c8d4de' : '#ffd166'; ctx.font = `${Math.round(H * 0.02)}px sans-serif`;
+  ctx.fillText(unlocked ? 'Best: ' + prog.bestScore + ' pkt' : 'ZABLOKOWANE', cx, H * 0.198);
 
   // === A: top HUD (poziom + XP + chipy zasobów) ===
   ctx.beginPath(); ctx.arc(W * 0.10, H * 0.045, W * 0.035, 0, Math.PI * 2);
@@ -210,6 +211,19 @@ function renderHome(ctx, s) {
   chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', String(s.progress.coins)); // złoto = realne monety
   chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');          // gemy (placeholder)
   chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');    // energia (brak gate'u)
+
+  // bohater Tofu — CENTRALNY; siedzi i przysypia (doze) albo zarzuca (cast) po STARCIE
+  const catCy = H * 0.47, catH = H * 0.30;
+  catRect = { x: cx - W * 0.30, y: catCy - catH / 2, w: W * 0.60, h: catH };
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.46, W * 0.22, H * 0.02, 0, 0, Math.PI * 2); ctx.fill();
+  const catSheet = keyedSheet(s.cast ? CAT_CAST : CAT_DOZE);
+  if (catSheet) {
+    let frame;
+    if (s.cast) frame = Math.min(5, Math.floor(s.cast.t / CAST_DUR * 6));
+    else { _homeFrame++; frame = Math.floor(_homeFrame / 12) % 6; }
+    drawSheet(ctx, catSheet, frame, 6, cx, catCy, catH);
+  }
 
   // === D: START ===
   const btnW = W * 0.66, btnH = H * 0.092, bx = cx - btnW / 2, byy = H * 0.715 - btnH / 2;
@@ -254,7 +268,7 @@ function renderHome(ctx, s) {
   // skrzynka do odebrania (jeśli jest oczekująca)
   let chest = null;
   if (s.progress.pendingChests > 0) {
-    chest = { x: W * 0.05, y: H * 0.47, w: W * 0.17, h: W * 0.17 };
+    chest = { x: W * 0.05, y: H * 0.60, w: W * 0.17, h: W * 0.17 };
     fillRR(ctx, chest.x, chest.y, chest.w, chest.h, 8, '#3a2f12');
     rrPath(ctx, chest.x, chest.y, chest.w, chest.h, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 2; ctx.stroke();
     ctx.fillStyle = '#ffcb45'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(chest.w * 0.2)}px sans-serif`;
@@ -264,13 +278,7 @@ function renderHome(ctx, s) {
   }
 
   ctx.textAlign = 'left';
-  const ar = W * 0.055;
-  s._home = {
-    stage: { x: ax, y: ay, w: S, h: S },
-    left: { x: W * 0.085 - ar, y: cyArt - ar, w: ar * 2, h: ar * 2 },
-    right: { x: W * 0.915 - ar, y: cyArt - ar, w: ar * 2, h: ar * 2 },
-    start, backpack, chest,
-  };
+  s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest };
 
   // overlay otwarcia skrzynki
   if (s.chestReveal) {
@@ -296,6 +304,15 @@ function drawCover(ctx, im, x, y, w, h) {
   const scale = Math.max(w / iw, h / ih);
   const dw = iw * scale, dh = ih * scale;
   ctx.drawImage(im, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
+// rysuje klatkę `frame` z poziomego sprite-sheetu (frames w rzędzie), wyśrodkowaną w (cx,cy)
+// `im` może być <img> lub <canvas> (po keyedSheet), stąd fallback width/height.
+function drawSheet(ctx, im, frame, frames, cx, cy, targetH) {
+  const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+  const fw = iw / frames, fh = ih;
+  const w = fw * (targetH / fh);
+  ctx.drawImage(im, frame * fw, 0, fw, fh, cx - w / 2, cy - targetH / 2, w, targetH);
 }
 
 function rrPath(ctx, x, y, w, h, r) {

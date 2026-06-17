@@ -61,6 +61,9 @@ export const ITEMS = {
 // Nagroda ze skrzynki za ukończenie stage (≥1★). Pierwsza skrzynka wymusza Kotwicę.
 export const CHEST_SC = 120;
 
+// Czas animacji zarzutu kota (s) po STARCIE, zanim zejdziemy pod wodę.
+export const CAST_DUR = 1.0;
+
 // 3 archetypy: jedna oś = HP vs okno. scoreValue liczy się przy ogłuszeniu.
 export const FISH_TYPES = {
   // speed = pozioma prędkość pływania (px/s). Wyższa niż szybkoscOpadania, żeby
