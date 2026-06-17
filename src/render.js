@@ -33,10 +33,99 @@ function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
 
 export function render(ctx, s, hookX, hookY) {
   ctx.clearRect(0, 0, WORLD.W, WORLD.H);
-  if (s.mode === 'HOME') return renderHome(ctx, s);
-  if (s.mode === 'BACKPACK') return renderBackpack(ctx, s);
+  if (s.mode === 'HOME') { renderHome(ctx, s); drawTutorial(ctx, s); return; }
+  if (s.mode === 'BACKPACK') { renderBackpack(ctx, s); drawTutorial(ctx, s); return; }
   renderDescent(ctx, s, hookX, hookY);
   if (s.mode === 'END') renderEnd(ctx, s);
+}
+
+// === TUTORIAL: dymki + łapka + strzałki, sterowany stanem ===
+let _tutFrame = 0;
+function rectCenter(r) { return { x: r.x + r.w / 2, y: r.y + r.h / 2 }; }
+function tutCellRect(gi, idx) {
+  const c = idx % BACKPACK.cols, r = Math.floor(idx / BACKPACK.cols);
+  return { x: gi.ox + c * gi.cell, y: gi.oy + r * gi.cell, w: gi.cell, h: gi.cell };
+}
+function freeAdjacentToHook(grid) {
+  const { cells, cols, rows } = grid;
+  let hi = -1;
+  for (let i = 0; i < cells.length; i++) { const it = cells[i] && ITEMS[cells[i]]; if (it && it.kind === 'hook') { hi = i; break; } }
+  if (hi < 0) return -1;
+  const r = Math.floor(hi / cols), c = hi % cols, nb = [];
+  if (r > 0) nb.push(hi - cols); if (r < rows - 1) nb.push(hi + cols);
+  if (c > 0) nb.push(hi - 1); if (c < cols - 1) nb.push(hi + 1);
+  for (const n of nb) if (!cells[n]) return n;
+  return nb.length ? nb[0] : -1;
+}
+
+function drawTutorial(ctx, s) {
+  _tutFrame++;
+  const W = WORLD.W, H = WORLD.H, bob = Math.abs(Math.sin(_tutFrame * 0.09)) * 8;
+  let target = null, text = null, from = null;
+
+  if (s.mode === 'HOME') {
+    const h = s._home; if (!h) return;
+    if (!s.hook) { target = rectCenter(h.backpack); text = 'Otwórz plecak — załóż hak'; }
+    else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { target = rectCenter(h.backpack); text = 'Masz Kotwicę! Otwórz plecak'; }
+    else if (s.progress.pendingChests > 0 && !s.progress.gotAnchor && h.chest) { target = rectCenter(h.chest); text = 'Otwórz skrzynię!'; }
+    else if (!s.progress.gotAnchor && s.progress.stages[0].stars === 0 && h.start) { target = rectCenter(h.start); text = 'Tap START, by zarzucić'; }
+  } else if (s.mode === 'BACKPACK') {
+    const gi = s._grid;
+    if (!s.hook && gi) { target = rectCenter(tutCellRect(gi, 4)); text = 'Tap pole, by włożyć hak'; }
+    else if (s.hook && s.progress.gotAnchor && s.hook.maxLatch < 2) {
+      if (s.progress.inventory.anchor > 0 && s._bpInv && s._bpInv[0]) { target = rectCenter(s._bpInv[0].rect); text = 'Tap, by włożyć Kotwicę'; }
+      else if (gi) {
+        const ai = s.grid.cells.indexOf('anchor'), adj = freeAdjacentToHook(s.grid);
+        if (ai >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, ai)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Kotwicę obok haka'; }
+      }
+    } else if (s.hook && s.hook.maxLatch >= 2 && s.progress.gotAnchor && !s.progress.tutAnchorDone) {
+      target = { x: W / 2, y: H * 0.52 }; text = 'Połączone! Kotwica daje +1 rybę naraz i +1 atk';
+    }
+  }
+  if (!text) return;
+
+  if (from) tutArrow(ctx, from.x, from.y, target.x, target.y);
+  pulseRing(ctx, target.x, target.y, gi_radius(), _tutFrame);
+  drawHand(ctx, target.x, target.y + 16, bob);
+  const by = target.y < H * 0.28 ? target.y + H * 0.11 : target.y - H * 0.10;
+  drawBubble(ctx, target.x, by, text);
+}
+
+function gi_radius() { return Math.round(WORLD.H * 0.035); }
+
+function pulseRing(ctx, cx, cy, r, frame) {
+  const p = (Math.sin(frame * 0.12) + 1) / 2;
+  ctx.strokeStyle = `rgba(255,203,69,${0.45 + 0.4 * p})`; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(cx, cy, r + p * 8, 0, Math.PI * 2); ctx.stroke();
+}
+
+function drawHand(ctx, x, y, bob) {
+  const hy = y + 14 + bob; // łapka nieco pod targetem, wskazuje w górę
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5;
+  // palec (trójkąt w górę)
+  ctx.beginPath(); ctx.moveTo(x, hy - 16); ctx.lineTo(x - 9, hy); ctx.lineTo(x + 9, hy); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // pięść
+  fillRR(ctx, x - 11, hy - 2, 22, 17, 7, '#fff');
+  rrPath(ctx, x - 11, hy - 2, 22, 17, 7); ctx.stroke();
+}
+
+function drawBubble(ctx, cx, cy, text) {
+  ctx.font = `bold ${Math.round(WORLD.H * 0.021)}px sans-serif`; ctx.textAlign = 'center';
+  const w = ctx.measureText(text).width + 28, h = Math.round(WORLD.H * 0.05);
+  let x = cx - w / 2; const y = cy - h / 2;
+  x = Math.max(8, Math.min(WORLD.W - w - 8, x));
+  fillRR(ctx, x, y, w, h, 10, 'rgba(255,255,255,0.96)');
+  ctx.fillStyle = '#0a1b2b'; ctx.fillText(text, x + w / 2, y + h / 2 + WORLD.H * 0.0075);
+}
+
+function tutArrow(ctx, x1, y1, x2, y2) {
+  ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.beginPath(); ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 14 * Math.cos(a - 0.4), y2 - 14 * Math.sin(a - 0.4));
+  ctx.lineTo(x2 - 14 * Math.cos(a + 0.4), y2 - 14 * Math.sin(a + 0.4));
+  ctx.closePath(); ctx.fillStyle = '#ffcb45'; ctx.fill(); ctx.lineCap = 'butt';
 }
 
 // --- HOME: layout wg specu UI (strefy A–F, scrimy, glass, START dominuje) ---

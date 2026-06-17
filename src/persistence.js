@@ -15,6 +15,7 @@ export function defaultProgress(stageCount) {
     pendingChests: 0,    // skrzynki do otwarcia na Home
     gotAnchor: false,    // czy pierwsza (wymuszona) Kotwica już przyznana
     inventory: {},       // akcesoria posiadane, nieumieszczone: { id: count }
+    tutAnchorDone: false, // czy tutorial łączenia kotwicy zaliczony
   };
 }
 
@@ -35,6 +36,7 @@ export function loadProgress(stageCount) {
           prog.pendingChests = data.pendingChests || 0;
           prog.gotAnchor = !!data.gotAnchor;
           prog.inventory = data.inventory || {};
+          prog.tutAnchorDone = !!data.tutAnchorDone;
         }
       }
     }

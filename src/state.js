@@ -80,7 +80,13 @@ export function stageUnlocked(s, i = s.stageIndex) {
   return !!(s.progress.stages[i] && s.progress.stages[i].unlocked);
 }
 export function openBackpack(s) { if (s.mode === 'HOME') s.mode = 'BACKPACK'; }
-export function closeBackpack(s) { if (s.mode === 'BACKPACK') s.mode = 'HOME'; }
+export function closeBackpack(s) {
+  if (s.mode !== 'BACKPACK') return;
+  s.mode = 'HOME';
+  if (s.hook && s.hook.maxLatch >= 2 && !s.progress.tutAnchorDone) {
+    s.progress.tutAnchorDone = true; saveProgress(s.progress);  // zobaczył komunikat o połączeniu
+  }
+}
 export function returnHome(s) { s.mode = 'HOME'; }
 
 // --- plecak: hak (tutorial) + akcesoria ---
