@@ -32,7 +32,7 @@ function keyedSheet(src) {
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
     if (lum > 225 && (Math.max(r, g, b) - Math.min(r, g, b)) < 14) cand[p] = 1; // neutralna biel
   }
-  const seen = new Uint8Array(N), big = N * 0.0006; // próg pola: tło/kieszenie » drobne refleksy (oczy)
+  const seen = new Uint8Array(N), big = N * 0.00008; // próg pola: tło/kieszenie (też małe w komórkach sheetu) » refleksy
   for (let s0 = 0; s0 < N; s0++) {
     if (!cand[s0] || seen[s0]) continue;
     const stack = [s0], px = [s0]; seen[s0] = 1;
@@ -66,7 +66,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b16'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b17'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -230,24 +230,20 @@ function renderHome(ctx, s) {
   ctx.fillText(A.name, cx, H * 0.148);
   ctx.restore();
 
-  // bohater Tofu — FRONT, CAŁY; nogi stołka osadzone na deskach molo (~0.53H), mniejszy
-  const baselineY = H * 0.53, catH = H * 0.23, catCy = baselineY - catH * 0.5;
+  // bohater Tofu — FRONT; nogi stołka osadzone na deskach molo (~0.53H), mniejszy (margines)
+  const baselineY = H * 0.53, catH = H * 0.21, catCy = baselineY - catH * 0.5;
   catRect = { x: cx - W * 0.22, y: baselineY - catH * 0.9, w: W * 0.44, h: catH * 0.9 };
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
   ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.13, H * 0.010, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
-  const castSheet = keyedSheet(CAT_CAST_SHEET);
+  const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
   if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
     drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
-  } else if (!s.cast && ready(img(CAT_FRONT_IDLE))) {
-    // idle: kompletna poza (cały stołek, zero przecieków); oddech + mruganie z kodu + Zzz
-    const breath = 1 + Math.sin(now * 1.5) * 0.012;
-    ctx.save(); ctx.translate(cx, baselineY); ctx.scale(1, breath); ctx.translate(-cx, -baselineY);
-    drawCatFrame(ctx, CAT_FRONT_IDLE, 0, 1, 1, cx, baselineY, catH);
-    const bp = now % 3.4, blink = bp < 0.15 ? Math.sin((bp / 0.15) * Math.PI) : 0; // co 3.4s, ~150ms
-    if (blink > 0.03) drawBlink(ctx, blink);
-    ctx.restore();
+  } else if (!s.cast && idleSheet) {
+    // idle: animowany sheet (prawdziwe klatki mrugania/przysypiania); korpus przybity do molo
+    const f = Math.floor(now * 1000 / 280) % CAT_FRAMES;
+    drawCatFrame(ctx, CAT_IDLE_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
     drawDozeZ(ctx, cx - catH * 0.22, baselineY - catH * 1.02, now); // Zzz nad główką
   } else {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
@@ -398,7 +394,7 @@ function _pixCtx(c) {
 
 // Przycięcie komórki kota: GÓRA i BOKI tną przeciek z sąsiednich klatek (fragmenty stołka/wędki),
 // DÓŁ nietknięty (stołek w całości). Region = [cropSide..1-cropSide] × [cropTop..1] komórki.
-const CAT_CROP_TOP = 0.08, CAT_CROP_SIDE = 0.03;
+const CAT_CROP_TOP = 0.05, CAT_CROP_SIDE = 0.015;
 
 // UNIA bbox treści wszystkich klatek w PRZYCIĘTYM regionie (współrzędne lokalne regionu),
 // liczona raz i cache'owana. Normalizuje kadr sheetu (stały rozmiar) i jest stała dla wszystkich
@@ -461,30 +457,6 @@ function drawCatFrame(ctx, src, frame, cols, rows, cx, baselineY, contentH) {
   const destX = cx - (lb.x + lb.w / 2) * sc;
   const destY = baselineY - (lb.y + lb.h) * sc;
   ctx.drawImage(c, x0, y0, cw, ch, destX, destY, cw * sc, ch * sc);
-  // zapis transformacji: ułamek obrazu (fx,fy) -> ekran. fx,fy w [0..1] względem całego obrazu.
-  _catXf = { src, sc, destX, destY, x0, y0, iw: IW, ih: IH };
-}
-let _catXf = null;
-
-// Mrugnięcie z kodu: kremowa powieka opadająca na oczka (amt 0..1). Pozycje oczu = stałe ułamki
-// obrazu pozy (skalibrowane). Rysowane wewnątrz transformacji oddechu, więc spójne z kotem.
-const EYES = [{ fx: 0.444, fy: 0.384 }, { fx: 0.551, fy: 0.384 }]; // L, P oko (ułamki obrazu)
-const EYE_RX = 0.062, EYE_RY = 0.060; // promienie jako ułamek szerokości/wysokości obrazu
-function drawBlink(ctx, amt) {
-  const xf = _catXf; if (!xf) return;
-  for (const e of EYES) {
-    const X = xf.destX + (e.fx * xf.iw - xf.x0) * xf.sc;
-    const Y = xf.destY + (e.fy * xf.ih - xf.y0) * xf.sc;
-    const rx = EYE_RX * xf.iw * xf.sc, ry = EYE_RY * xf.ih * xf.sc;
-    // kremowa powieka opadająca od góry — przy amt=1 w pełni zakrywa oko
-    ctx.fillStyle = '#f7ddb0';
-    ctx.beginPath(); ctx.ellipse(X, Y - ry * (1 - amt), rx, ry, 0, 0, Math.PI * 2); ctx.fill();
-    // kreska zamkniętego oczka „^" (rzęsy) — pojawia się przy mocnym mrugnięciu
-    if (amt > 0.6) {
-      ctx.strokeStyle = `rgba(70,45,30,${(amt - 0.6) / 0.4 * 0.75})`; ctx.lineWidth = Math.max(1.5, rx * 0.18); ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(X - rx * 0.7, Y + ry * 0.15); ctx.quadraticCurveTo(X, Y - ry * 0.25, X + rx * 0.7, Y + ry * 0.15); ctx.stroke(); ctx.lineCap = 'butt';
-    }
-  }
 }
 
 // pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
