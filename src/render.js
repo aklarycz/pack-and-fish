@@ -64,13 +64,14 @@ const CAT_IDLE_SHEET = 'assets/cat/cat-front-idle-sheet-3x3.png';
 const CAT_CAST_SHEET = 'assets/cat/cat-front-cast-sheet-3x3.png';
 const CAT_COLS = 3, CAT_ROWS = 3, CAT_FRAMES = 9;
 const CAT_SLEEP_FRAME = 4; // klatka z zamkniętymi oczami (kot śpi na Home)
+const CAST_FIT = 0.82; // korekta rozmiaru castu (sheet) do pozy śpiącej (inne kadrowanie treści)
 const STAGE_SPRITE = ['assets/stages/stage1.png', 'assets/stages/stage2.png', 'assets/stages/stage3.png'];
 const STAGE_LOCKED = [null, 'assets/stages/stage2_locked.png', 'assets/stages/stage3_locked.png'];
 const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b25'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b26'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -243,7 +244,8 @@ function renderHome(ctx, s) {
   const castSheet = keyedSheet(CAT_CAST_SHEET);
   if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
-    drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+    // cast to inny asset (sheet) — CAST_FIT zrównuje rozmiar kota z pozą śpiącą (różne kadrowanie)
+    drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH * CAST_FIT);
   } else if (!s.cast && keyedSheet(CAT_FRONT_SLEEP)) {
     // śpi: osobna poza (cały stołek, zamknięte oczy) + oddech + Zzz; budzi się i zarzuca po STARCIE
     const breath = 1 + Math.sin(now * 1.3) * 0.01;
