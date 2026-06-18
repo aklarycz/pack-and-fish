@@ -11,9 +11,10 @@ function img(src) {
 }
 function ready(im) { return im && im.complete && im.naturalWidth > 0; }
 
-// Niektóre assety z GPT mają wypalone tło (białe/checker, bez alpha). Usuwamy je
-// flood-fillem od krawędzi: kasujemy jasne piksele połączone z brzegiem, zatrzymując
-// się na ciemnym outline — więc wnętrze (np. biały brzuszek kota) zostaje. Cache.
+// Usuwa tło z assetów GPT, łącznie z ZAMKNIĘTYMI kieszeniami (np. trójkąty w ramie
+// krzesełka), których flood-fill od krawędzi nie dosięga. Metoda: znajdź spójne obszary
+// NEUTRALNIE-białych pikseli (R≈G≈B, jasne) i usuń te o DUŻYM polu (tło + kieszenie).
+// Ciepła biel kota (kremowy podkoszulek: R>B) i drobne refleksy (małe obszary) zostają. Cache.
 const _keyed = {};
 function keyedSheet(src) {
   const im = img(src);
@@ -23,13 +24,25 @@ function keyedSheet(src) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const cc = c.getContext('2d'); cc.drawImage(im, 0, 0);
   let id; try { id = cc.getImageData(0, 0, w, h); } catch (e) { _keyed[src] = im; return im; }
-  if (id.data[3] < 10) { _keyed[src] = im; return im; } // już ma alfę
-  const d = id.data, seen = new Uint8Array(w * h), st = [];
-  const lum = (p) => 0.299 * d[p * 4] + 0.587 * d[p * 4 + 1] + 0.114 * d[p * 4 + 2];
-  const push = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const p = y * w + x; if (seen[p] || lum(p) < 170) return; seen[p] = 1; st.push(p); };
-  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
-  for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
-  while (st.length) { const p = st.pop(); d[p * 4 + 3] = 0; const x = p % w, y = (p / w) | 0; push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1); }
+  const d = id.data, N = w * h;
+  const cand = new Uint8Array(N);
+  for (let p = 0; p < N; p++) {
+    if (d[p * 4 + 3] < 20) continue;
+    const r = d[p * 4], g = d[p * 4 + 1], b = d[p * 4 + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (lum > 225 && (Math.max(r, g, b) - Math.min(r, g, b)) < 14) cand[p] = 1; // neutralna biel
+  }
+  const seen = new Uint8Array(N), big = N * 0.0006; // próg pola: tło/kieszenie » refleksy
+  for (let s0 = 0; s0 < N; s0++) {
+    if (!cand[s0] || seen[s0]) continue;
+    const stack = [s0], px = [s0]; seen[s0] = 1;
+    while (stack.length) {
+      const p = stack.pop(), x = p % w, y = (p / w) | 0;
+      const nb = []; if (x > 0) nb.push(p - 1); if (x < w - 1) nb.push(p + 1); if (y > 0) nb.push(p - w); if (y < h - 1) nb.push(p + w);
+      for (const n of nb) if (cand[n] && !seen[n]) { seen[n] = 1; stack.push(n); px.push(n); }
+    }
+    if (px.length > big) for (const p of px) d[p * 4 + 3] = 0;
+  }
   cc.putImageData(id, 0, 0);
   _keyed[src] = c; return c;
 }
@@ -53,7 +66,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b10'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b11'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -226,7 +239,7 @@ function renderHome(ctx, s) {
   const castSheet = keyedSheet(CAT_CAST_SHEET), idleStill = img(CAT_FRONT_IDLE);
   if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
-    drawSheetStable(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+    drawCatCast(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
   } else if (!s.cast && ready(idleStill)) {
     // idle: czysta poza z alfą grafika (zero białych kieszeni / ucięć stołka), delikatny oddech
     const bob = Math.sin(now * 1.6) * H * 0.004;
@@ -424,6 +437,39 @@ function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, contentH, i
   const destX = cx - (ub.x + ub.w / 2) * sc;
   const destY = baselineY - (ub.y + ub.h) * sc;
   ctx.drawImage(c, x0, y0, cw, ch, destX, destY, dw, dh);
+}
+
+// bbox DOLNEJ części klatki (siedzący korpus + stołek — stabilny między klatkami castu),
+// współrzędne lokalne komórki. Cache per (src,frame,topFrac).
+const _lb = {};
+function lowerBBox(src, frame, cols, rows, topFrac) {
+  const key = src + '|' + frame + '|' + topFrac;
+  if (_lb[key]) return _lb[key];
+  const c = keyedSheet(src); if (!c) return null;
+  const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height, fw = IW / cols, fh = IH / rows;
+  const col = frame % cols, row = Math.floor(frame / cols) % rows;
+  let d; try { d = _pixCtx(c).getImageData(0, 0, IW, IH).data; } catch (e) { return null; }
+  const ox = Math.floor(col * fw), oy = Math.floor(row * fh), yStart = Math.floor(topFrac * fh);
+  let minx = fw, miny = fh, maxx = 0, maxy = 0, found = false;
+  for (let y = yStart; y < fh; y++) for (let x = 0; x < fw; x++) {
+    if (d[((oy + y) * IW + (ox + x)) * 4 + 3] > 30) { found = true; if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y; }
+  }
+  const bb = found ? { x: minx, y: miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: 0, y: yStart, w: fw, h: fh - yStart };
+  _lb[key] = bb; return bb;
+}
+
+// Cast STABILNY: rozmiar ze stałego union-bbox, ale pozycja kotwiczona po DOLNYM korpusie
+// danej klatki (środek-X i dół) — siedzący kot stoi w miejscu, a wędka/łapy się ruszają.
+function drawCatCast(ctx, src, frame, cols, rows, cx, baselineY, contentH) {
+  const c = keyedSheet(src); if (!c) return;
+  const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height, fw = IW / cols, fh = IH / rows;
+  const ub = unionBBox(src, cols, rows, 0); if (!ub) return;
+  const lb = lowerBBox(src, frame, cols, rows, 0.42); if (!lb) return;
+  const col = frame % cols, row = Math.floor(frame / cols) % rows;
+  const sc = contentH / ub.h;
+  const destX = cx - (lb.x + lb.w / 2) * sc;
+  const destY = baselineY - (lb.y + lb.h) * sc;
+  ctx.drawImage(c, col * fw, row * fh, fw, fh, destX, destY, fw * sc, fh * sc);
 }
 
 // pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
