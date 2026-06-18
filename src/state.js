@@ -183,12 +183,16 @@ export function startStage(s) {
   s.fish = []; s.latched = []; s.bubbles = []; s.spawnTimer = 0;
   const stage = STAGES[s.stageIndex];
   s.stageOffsetM = stage.difficultyOffsetM;
-  // worek ryb easy->hard (spawn bierze z przodu) — gwarantuje pulę i max score
-  const bag = [];
+  // spawn MIESZANY (nie falami): każdej rybie losujemy pozycję w sekwencji z okna wg trudności —
+  // bass dominuje na starcie, sumy dochodzą po chwili (mieszają się z bassami), muskie na sam koniec.
+  const SPAWN_WIN = { plotka: [0.0, 0.82], sredniak: [0.28, 1.0], twardziel: [0.92, 1.0] };
+  const items = [];
   for (const t of ['plotka', 'sredniak', 'twardziel']) {
-    for (let k = 0; k < (stage.bag[t] || 0); k++) bag.push(t);
+    const w = SPAWN_WIN[t] || [0, 1];
+    for (let k = 0; k < (stage.bag[t] || 0); k++) items.push({ t, key: w[0] + Math.random() * (w[1] - w[0]) });
   }
-  s.fishQueue = bag;
+  items.sort((a, b) => a.key - b.key);
+  s.fishQueue = items.map(it => it.t);
   s.mode = 'DESCENT';
   return true;
 }
