@@ -2,10 +2,11 @@ import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, ARE
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
+const ASSET_VER = 'b7'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
 const _imgCache = {};
 function img(src) {
   let im = _imgCache[src];
-  if (!im) { im = new Image(); im.src = src; _imgCache[src] = im; }
+  if (!im) { im = new Image(); im.src = src + (src.indexOf('?') < 0 ? '?' : '&') + 'v=' + ASSET_VER; _imgCache[src] = im; }
   return im;
 }
 function ready(im) { return im && im.complete && im.naturalWidth > 0; }
@@ -52,7 +53,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b6'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b7'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -217,7 +218,7 @@ function renderHome(ctx, s) {
   ctx.restore();
 
   // bohater Tofu — FRONT, CAŁY (stołek na linii molo), stały rozmiar treści niezależny od kadru sheetu
-  const baselineY = H * 0.56, catH = H * 0.40, catCy = baselineY - catH * 0.5;
+  const baselineY = H * 0.56, catH = H * 0.32, catCy = baselineY - catH * 0.5;
   catRect = { x: cx - W * 0.22, y: baselineY - catH * 0.9, w: W * 0.44, h: catH * 0.9 };
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
   ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.13, H * 0.010, 0, 0, Math.PI * 2); ctx.fill();
@@ -323,9 +324,12 @@ function renderHome(ctx, s) {
     ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(String(s.progress.pendingChests), chest.x + chest.w, chest.y + 5);
   }
 
-  // znacznik buildu (mały, w rogu) — diagnostyka świeżości kodu
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = `bold ${Math.round(H * 0.016)}px monospace`; ctx.textAlign = 'left';
-  ctx.fillText(BUILD, W * 0.02, H * 0.86);
+  // znacznik buildu + diagnostyka wczytanego sheetu (wymiary + wysokość bbox treści)
+  let dbg = BUILD;
+  const _dc = keyedSheet(CAT_IDLE_SHEET);
+  if (_dc) { const ub = unionBBox(CAT_IDLE_SHEET, CAT_COLS, CAT_ROWS, 0.04); if (ub) dbg += ` ${ub.IW}x${ub.IH} ub${Math.round(ub.h)}/${Math.round(ub.cellH)}`; }
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = `bold ${Math.round(H * 0.015)}px monospace`; ctx.textAlign = 'left';
+  ctx.fillText(dbg, W * 0.02, H * 0.86);
 
   ctx.textAlign = 'left';
   s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest, stageNodes };
@@ -379,39 +383,46 @@ function _pixCtx(c) {
 // UNIA bbox-ów treści wszystkich klatek (współrzędne LOKALNE komórki), liczona raz i cache'owana.
 // Normalizuje padding/kadr sheetu: niezależnie ile marginesu ma eksport, treść jest tej samej
 // wielkości po przeskalowaniu. Stała dla wszystkich klatek → zero jittera.
+// Unia bbox treści w PRZYCIĘTYM (inset) obszarze każdej komórki, współrzędne lokalne obszaru
+// inset. Inset tnie przeciek z sąsiednich klatek. Cache per (src,inset).
 const _ub = {};
-function unionBBox(src, cols, rows) {
-  if (_ub[src]) return _ub[src];
+function unionBBox(src, cols, rows, inset) {
+  const key = src + '|' + inset;
+  if (_ub[key]) return _ub[key];
   const c = keyedSheet(src); if (!c) return null;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
   const fw = IW / cols, fh = IH / rows;
   let d; try { d = _pixCtx(c).getImageData(0, 0, IW, IH).data; } catch (e) { return null; }
-  let minx = fw, miny = fh, maxx = 0, maxy = 0, found = false;
+  const padX = fw * inset, padY = fh * inset, cw = fw - 2 * padX, ch = fh - 2 * padY;
+  let minx = cw, miny = ch, maxx = 0, maxy = 0, found = false;
   for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-    const ox = Math.floor(col * fw), oy = Math.floor(row * fh);
-    for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) {
+    const ox = Math.floor(col * fw + padX), oy = Math.floor(row * fh + padY);
+    for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
       if (d[((oy + y) * IW + (ox + x)) * 4 + 3] > 30) {
         found = true; if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
       }
     }
   }
-  const bb = found ? { x: minx, y: miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: 0, y: 0, w: fw, h: fh };
-  _ub[src] = bb; return bb;
+  const bb = found ? { x: minx, y: miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: 0, y: 0, w: cw, h: ch };
+  bb.IW = IW; bb.IH = IH; bb.cellH = fh; // metadane do diagnostyki
+  _ub[key] = bb; return bb;
 }
 
 // Rysuje klatkę kota STABILNIE i w STAŁYM rozmiarze: treść (unia bbox) skalowana do contentH,
-// środek-X treści w cx, DÓŁ treści (stołek) na baselineY — więc kot jest CAŁY (nic nie ucięte)
-// i tego samego rozmiaru niezależnie od kadrowania sheetu. Zmienia się tylko zawartość klatki.
-function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, contentH) {
+// środek-X treści w cx, DÓŁ treści (stołek) na baselineY — kot CAŁY (nic nie ucięte) i tego
+// samego rozmiaru niezależnie od kadrowania sheetu. Inset tnie przeciek z sąsiednich klatek.
+function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, contentH, inset = 0.04) {
   const c = keyedSheet(src); if (!c) return;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
   const fw = IW / cols, fh = IH / rows;
-  const ub = unionBBox(src, cols, rows); if (!ub) return;
+  const ub = unionBBox(src, cols, rows, inset); if (!ub) return;
   const col = frame % cols, row = Math.floor(frame / cols) % rows;
-  const sc = contentH / ub.h;
+  const x0 = col * fw + fw * inset, y0 = row * fh + fh * inset;
+  const cw = fw * (1 - 2 * inset), ch = fh * (1 - 2 * inset);
+  const sc = contentH / ub.h, dw = cw * sc, dh = ch * sc;
   const destX = cx - (ub.x + ub.w / 2) * sc;
   const destY = baselineY - (ub.y + ub.h) * sc;
-  ctx.drawImage(c, col * fw, row * fh, fw, fh, destX, destY, fw * sc, fh * sc);
+  ctx.drawImage(c, x0, y0, cw, ch, destX, destY, dw, dh);
 }
 
 // pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
