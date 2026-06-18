@@ -16,17 +16,20 @@ function ready(im) { return im && im.complete && im.naturalWidth > 0; }
 // NEUTRALNIE-białych pikseli (R≈G≈B, jasne) i usuń te o DUŻYM polu (tło + kieszenie).
 // Ciepła biel kota (kremowy podkoszulek: R>B) i drobne refleksy (małe obszary) zostają. Cache.
 const _keyed = {};
-function keyedSheet(src) {
+// aggressive=true: usuwa CAŁĄ neutralną biel (bez progu wielkości) — dla assetów bez białych
+// detali do ochrony (np. zarośla). false: usuwa tylko duże obszary (chroni biel kota/refleksy).
+function keyedSheet(src, aggressive = false) {
+  const key = src + (aggressive ? '|agg' : '');
   const im = img(src);
   if (!ready(im)) return null;
-  if (_keyed[src]) return _keyed[src];
+  if (_keyed[key]) return _keyed[key];
   const w = im.naturalWidth, h = im.naturalHeight;
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const cc = c.getContext('2d'); cc.drawImage(im, 0, 0);
-  let id; try { id = cc.getImageData(0, 0, w, h); } catch (e) { _keyed[src] = im; return im; }
+  let id; try { id = cc.getImageData(0, 0, w, h); } catch (e) { _keyed[key] = im; return im; }
   const d = id.data, N = w * h;
   // już ma prawdziwą alfę (przezroczysty róg) → tło/kieszenie wycięte przez grafika; nie ruszamy
-  if (d[3] < 20) { _keyed[src] = c; return c; }
+  if (d[3] < 20) { _keyed[key] = c; return c; }
   const cand = new Uint8Array(N);
   for (let p = 0; p < N; p++) {
     if (d[p * 4 + 3] < 20) continue;
@@ -34,19 +37,23 @@ function keyedSheet(src) {
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
     if (lum > 225 && (Math.max(r, g, b) - Math.min(r, g, b)) < 14) cand[p] = 1; // neutralna biel
   }
-  const seen = new Uint8Array(N), big = N * 0.00008; // próg pola: tło/kieszenie (też małe w komórkach sheetu) » refleksy
-  for (let s0 = 0; s0 < N; s0++) {
-    if (!cand[s0] || seen[s0]) continue;
-    const stack = [s0], px = [s0]; seen[s0] = 1;
-    while (stack.length) {
-      const p = stack.pop(), x = p % w, y = (p / w) | 0;
-      const nb = []; if (x > 0) nb.push(p - 1); if (x < w - 1) nb.push(p + 1); if (y > 0) nb.push(p - w); if (y < h - 1) nb.push(p + w);
-      for (const n of nb) if (cand[n] && !seen[n]) { seen[n] = 1; stack.push(n); px.push(n); }
+  if (aggressive) {
+    for (let p = 0; p < N; p++) if (cand[p]) d[p * 4 + 3] = 0; // wszystko białe precz
+  } else {
+    const seen = new Uint8Array(N), big = N * 0.00008; // próg pola: tło/kieszenie » refleksy
+    for (let s0 = 0; s0 < N; s0++) {
+      if (!cand[s0] || seen[s0]) continue;
+      const stack = [s0], px = [s0]; seen[s0] = 1;
+      while (stack.length) {
+        const p = stack.pop(), x = p % w, y = (p / w) | 0;
+        const nb = []; if (x > 0) nb.push(p - 1); if (x < w - 1) nb.push(p + 1); if (y > 0) nb.push(p - w); if (y < h - 1) nb.push(p + w);
+        for (const n of nb) if (cand[n] && !seen[n]) { seen[n] = 1; stack.push(n); px.push(n); }
+      }
+      if (px.length > big) for (const p of px) d[p * 4 + 3] = 0;
     }
-    if (px.length > big) for (const p of px) d[p * 4 + 3] = 0;
   }
   cc.putImageData(id, 0, 0);
-  _keyed[src] = c; return c;
+  _keyed[key] = c; return c;
 }
 const FISH_SPRITE = {
   plotka: 'assets/fish/plotka.png',
@@ -87,7 +94,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b30'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b31'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -206,6 +213,16 @@ function renderHome(ctx, s) {
   const A = ARENAS[arena], cx = W / 2;
   let homeLeft, homeRight, catRect;
 
+  // === Kamera „wejścia do wody" przy zarzucie: scena zjeżdża w górę, woda wypełnia od dołu ===
+  const castPart = s.cast ? Math.min(1, s.cast.t / CAST_DUR) : 0;
+  const panY = (castPart * castPart * (3 - 2 * castPart)) * H * 0.6; // smoothstep
+  if (castPart > 0) {
+    const wg = ctx.createLinearGradient(0, 0, 0, H);
+    wg.addColorStop(0, 'rgb(14,59,92)'); wg.addColorStop(1, 'rgb(4,20,34)');
+    ctx.fillStyle = wg; ctx.fillRect(0, 0, W, H);
+  }
+  ctx.save(); if (panY) ctx.translate(0, -panY);
+
   // 1. tło sceny areny (PNG jeśli jest, inaczej tintowany fallback per arena) 2. vignette 3/4. scrimy
   const bg = img(arenaBgSrc(i));
   if (ready(bg)) { ctx.fillStyle = '#0b1f33'; ctx.fillRect(0, 0, W, H); drawCover(ctx, bg, 0, 0, W, H); }
@@ -282,7 +299,7 @@ function renderHome(ctx, s) {
   }
 
   // przednie zarośla — kołyszą się; przy zarzucie rozsuwają się na boki (zanurzenie)
-  const fol = keyedSheet(FOLIAGE); // usuwa wypalone tło assetu
+  const fol = keyedSheet(FOLIAGE, true); // agresywne keying (zarośla bez białych detali)
   if (fol) drawFoliage(ctx, fol, W, H, now, s.cast ? Math.min(1, s.cast.t / CAST_DUR) : 0);
 
   // === Pasek wyboru STAGE 1-10 (nad przyciskiem) ===
@@ -367,6 +384,8 @@ function renderHome(ctx, s) {
     ctx.beginPath(); ctx.arc(chest.x + chest.w, chest.y, 12, 0, Math.PI * 2); ctx.fillStyle = '#ff4d4d'; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(String(s.progress.pendingChests), chest.x + chest.w, chest.y + 5);
   }
+
+  ctx.restore(); // koniec panoramy kamery (UI poniżej rysujemy bez przesunięcia)
 
   // znacznik buildu (mały, w rogu)
   ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = `bold ${Math.round(H * 0.015)}px monospace`; ctx.textAlign = 'left';
