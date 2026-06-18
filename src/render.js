@@ -219,8 +219,8 @@ function renderHome(ctx, s) {
   chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');          // gemy (placeholder)
   chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');    // energia (brak gate'u)
 
-  // bohater Tofu — FRONT; stopy na linii (baseline), mniejszy, spokojniejszy
-  const baselineY = H * 0.60, cellH = H * 0.34, catCy = baselineY - cellH * 0.45, catH = cellH;
+  // bohater Tofu — FRONT, siedzi na molo (stopy ~0.55H), woda przed nim
+  const baselineY = H * 0.55, cellH = H * 0.32, catCy = baselineY - cellH * 0.45, catH = cellH;
   catRect = { x: cx - W * 0.24, y: baselineY - cellH * 0.9, w: W * 0.48, h: cellH * 0.9 };
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.14, H * 0.011, 0, 0, Math.PI * 2); ctx.fill();
@@ -242,12 +242,7 @@ function renderHome(ctx, s) {
       if (!s.cast) drawDozeZ(ctx, cx + catH * 0.34, catCy - catH * 0.42, now);
     }
   }
-  // foliage (przednia warstwa) — kołysanie na wietrze (shear, dół rusza się najmocniej)
-  const fol = keyedSheet(FOLIAGE);
-  if (fol) {
-    const sway = Math.sin(now * 1.4) * 0.03;
-    ctx.save(); ctx.transform(1, 0, sway, 1, -sway * H, 0); drawCover(ctx, fol, 0, 0, W, H); ctx.restore();
-  }
+  // (warstwa listowia wyłączona — nowe tło areny ma własny pierwszy plan)
 
   // === D: START ===
   const btnW = W * 0.66, btnH = H * 0.092, bx = cx - btnW / 2, byy = H * 0.80 - btnH / 2;
