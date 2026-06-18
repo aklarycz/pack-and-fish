@@ -33,20 +33,27 @@ export function layoutWorld(W, H) {
   WORLD.hookStartY = Math.round((WORLD.hookMinY + WORLD.hookMaxY) / 2);
 }
 
-// Startowy hak = item w plecaku. Celowo SŁABY (patrz spec: nie stroimy pod "fun solo").
+// Startowy hak = item w plecaku. GOŁY (zardzewiały) jest celowo bardzo słaby: atk 1.
+// Moc daje brązowy hak (akcesorium dawane od razu w tutorialu, +7 → 8). Można wypiąć wszystko
+// i dalej zarzucić, ale wtedy atk1 (ledwo cokolwiek).
 export const STARTER_HOOK = {
   id: 'rusty_hook',
   name: 'Zardzewiały hak',
   kind: 'hook',
-  atk: 8,                // dmg/s zadawany zaczepionej rybie
+  atk: 1,                // dmg/s — goły hak prawie nic nie ubija
   zwrotnosc: 280,        // px/s dryfu L/P
   szybkoscOpadania: 40,  // px/s opadania (łagodny scroll w górę, by nie przebijał pływania ryb)
   maxLatch: 1,           // ile ryb naraz hak zaczepia (akcesoria dodają +)
   w: 1, h: 1,
 };
 
-// Akcesoria (plaster 2). Efekt liczy się TYLKO gdy połączone (adjacency) z hakiem.
-// Kotwica = "hak z 2 haków": +1 jednoczesny zaczep oraz +1 atk (raw, jak hak).
+// Akcesoria. Efekt liczy się TYLKO gdy połączone (adjacency) z hakiem.
+// Brązowy hak — startowe akcesorium (z tutoriala): +7 atk (rusty 1 + brąz 7 = 8 → łowi bass/sum).
+export const BRONZE_HOOK = {
+  id: 'bronze', name: 'Brązowy hak', kind: 'accessory',
+  atk: 7, w: 1, h: 1, desc: '+7 atk (połącz z hakiem)',
+};
+// Kotwica — z 1. skrzyni: +1 jednoczesny zaczep oraz +1 atk.
 export const ANCHOR = {
   id: 'anchor', name: 'Kotwica', kind: 'accessory',
   maxLatch: 1, atk: 1, w: 1, h: 1, desc: '+1 ryba naraz, +1 atk (połącz z hakiem)',
@@ -55,6 +62,7 @@ export const ANCHOR = {
 // Rejestr itemów (lookup po id z gridu plecaka).
 export const ITEMS = {
   [STARTER_HOOK.id]: STARTER_HOOK,
+  [BRONZE_HOOK.id]: BRONZE_HOOK,
   [ANCHOR.id]: ANCHOR,
 };
 

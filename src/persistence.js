@@ -1,6 +1,6 @@
 // Zapis postępu w localStorage (gwiazdki/best score/odblokowania + hak).
 // Guard na środowisko bez localStorage (testy Node) — wtedy działa na domyślnych.
-const KEY = 'packfish_progress_v3'; // bump = reset progresu (świeży start; v3 = areny×10 stage'y)
+const KEY = 'packfish_progress_v4'; // bump = reset progresu (v4 = start z brązowym hakiem w ekwipunku)
 
 export function defaultProgress(stageCount) {
   const stages = [];
@@ -14,7 +14,8 @@ export function defaultProgress(stageCount) {
     coins: 0,            // soft currency (do mergowania akcesoriów)
     pendingChests: 0,    // skrzynki do otwarcia na Home
     gotAnchor: false,    // czy pierwsza (wymuszona) Kotwica już przyznana
-    inventory: {},       // akcesoria posiadane, nieumieszczone: { id: count }
+    inventory: { bronze: 1 }, // start: brązowy hak (z tutoriala) — +7 atk po połączeniu
+    tutBronzeDone: false,     // czy tutorial zakładania brązowego haka zaliczony
     tutAnchorDone: false, // czy tutorial łączenia kotwicy zaliczony
   };
 }

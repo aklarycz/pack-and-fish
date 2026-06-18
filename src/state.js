@@ -95,9 +95,10 @@ export function openBackpack(s) { if (s.mode === 'HOME') s.mode = 'BACKPACK'; }
 export function closeBackpack(s) {
   if (s.mode !== 'BACKPACK') return;
   s.mode = 'HOME';
-  if (s.hook && s.hook.maxLatch >= 2 && !s.progress.tutAnchorDone) {
-    s.progress.tutAnchorDone = true; saveProgress(s.progress);  // zobaczył komunikat o połączeniu
-  }
+  let dirty = false;
+  if (s.hook && s.hook.atk >= 8 && !s.progress.tutBronzeDone) { s.progress.tutBronzeDone = true; dirty = true; }
+  if (s.hook && s.hook.maxLatch >= 2 && !s.progress.tutAnchorDone) { s.progress.tutAnchorDone = true; dirty = true; }
+  if (dirty) saveProgress(s.progress);
 }
 export function returnHome(s) { s.mode = 'HOME'; s.cast = null; s.reveal = null; }
 

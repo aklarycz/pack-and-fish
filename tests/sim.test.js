@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, placeHook, startStage } from '../src/state.js';
+import { createGame, placeHook, placeAccessory, startStage } from '../src/state.js';
 import { stepDescent } from '../src/sim.js';
 import { WORLD } from '../src/config.js';
 
 function started() {
-  const s = createGame(); placeHook(s, 0, 0); startStage(s);
+  // realny loadout: rusty hak (atk1) + brązowy hak obok (+7 = atk8) — jak po tutorialu
+  const s = createGame(); placeHook(s, 0, 0); placeAccessory(s, 'bronze'); startStage(s);
   return s;
 }
 

@@ -142,7 +142,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b44'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b45'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -192,17 +192,29 @@ function drawTutorial(ctx, s) {
   const W = WORLD.W, H = WORLD.H, bob = Math.abs(Math.sin(_tutFrame * 0.09)) * 8;
   let target = null, text = null, from = null;
 
+  const invRect = (id) => { const it = s._bpInv && s._bpInv.find(e => e.id === id); return it ? it.rect : null; };
   if (s.mode === 'HOME') {
     const h = s._home; if (!h) return;
     if (!s.hook) { target = rectCenter(h.backpack); text = 'Otwórz plecak — załóż hak'; }
+    else if (s.hook.atk < 8) { target = rectCenter(h.backpack); text = 'Otwórz plecak — wzmocnij hak'; }
     else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { target = rectCenter(h.backpack); text = 'Masz Kotwicę! Otwórz plecak'; }
     else if (s.progress.pendingChests > 0 && !s.progress.gotAnchor && h.chest) { target = rectCenter(h.chest); text = 'Otwórz skrzynię!'; }
     else if (!s.progress.gotAnchor && s.progress.stages[0].stars === 0 && h.start) { target = rectCenter(h.start); text = 'Tap, by zarzucić wędkę'; }
   } else if (s.mode === 'BACKPACK') {
     const gi = s._grid;
     if (!s.hook && gi) { target = rectCenter(tutCellRect(gi, 4)); text = 'Tap pole, by włożyć hak'; }
-    else if (s.hook && s.progress.gotAnchor && s.hook.maxLatch < 2) {
-      if (s.progress.inventory.anchor > 0 && s._bpInv && s._bpInv[0]) { target = rectCenter(s._bpInv[0].rect); text = 'Tap, by włożyć Kotwicę'; }
+    else if (s.hook && s.hook.atk < 8) { // brązowy hak (start): włóż i połącz → +7 atk
+      const r = invRect('bronze');
+      if (r) { target = rectCenter(r); text = 'Tap, by włożyć Brązowy hak'; }
+      else if (gi) {
+        const bi = s.grid.cells.indexOf('bronze'), adj = freeAdjacentToHook(s.grid);
+        if (bi >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, bi)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Brązowy hak obok haka'; }
+      }
+    } else if (s.hook && s.hook.atk >= 8 && !s.progress.gotAnchor && !s.progress.tutBronzeDone && s._backpackBack) {
+      target = rectCenter(s._backpackBack); text = 'Połączone! +7 atk — Wróć na Home';
+    } else if (s.hook && s.progress.gotAnchor && s.hook.maxLatch < 2) {
+      const r = invRect('anchor');
+      if (r) { target = rectCenter(r); text = 'Tap, by włożyć Kotwicę'; }
       else if (gi) {
         const ai = s.grid.cells.indexOf('anchor'), adj = freeAdjacentToHook(s.grid);
         if (ai >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, ai)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Kotwicę obok haka'; }
@@ -679,9 +691,11 @@ function roundedBtn(ctx, r, color, label) {
 
 function drawItemCell(ctx, it, x, y, cell) {
   const pad = cell * 0.12;
-  fillRR(ctx, x + pad, y + pad, cell - 2 * pad, cell - 2 * pad, 6, it.kind === 'hook' ? '#cdbb6a' : '#5aa9e0');
-  ctx.fillStyle = '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(cell * 0.16)}px sans-serif`;
-  ctx.fillText(it.kind === 'hook' ? 'HAK' : 'KOTW', x + cell / 2, y + cell / 2 + cell * 0.06);
+  const col = it.kind === 'hook' ? '#9aa3ad' : it.id === 'bronze' ? '#c87f3a' : '#5aa9e0';
+  const label = it.kind === 'hook' ? 'HAK' : it.id === 'bronze' ? 'BRĄZ' : 'KOTW';
+  fillRR(ctx, x + pad, y + pad, cell - 2 * pad, cell - 2 * pad, 6, col);
+  ctx.fillStyle = '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(cell * 0.15)}px sans-serif`;
+  ctx.fillText(label, x + cell / 2, y + cell / 2 + cell * 0.06);
 }
 
 function renderBackpack(ctx, s) {
