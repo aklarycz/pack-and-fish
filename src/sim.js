@@ -13,6 +13,7 @@ function removeFish(s, f) {
 
 export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   if (s.mode !== 'DESCENT') return;
+  if (s.reveal) return; // kurtyna jeszcze zakrywa/odsłania — hak nie tonie, ryby nie spawnują
   // trudność liczona od głębokości + offsetu stage'a (stage startuje "głębiej")
   const depthM = s.depthPx / WORLD.pxPerMeter + (s.stageOffsetM || 0);
   const diff = difficultyAt(depthM);

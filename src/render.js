@@ -62,8 +62,10 @@ const FISH_SPRITE = {
   twardziel: 'assets/fish/twardziel.png',
 };
 const BUBBLE_SRC = 'assets/bubble.png';
-const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla; kurtyna przejścia
-const REVEAL_DUR = 0.6; // czas rozjeżdżania się kurtyny na starcie descentu (s)
+const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla (Home) + fallback kurtyny
+const CURTAIN = 'assets/arenas/arena-01-curtain.png'; // dedykowana kurtyna przejścia (pełna wysokość, alfa)
+const REVEAL_HOLD = 0.3;  // ile kurtyna trzyma ZAKRYTE po wejściu pod wodę ("loading")
+const REVEAL_OPEN = 0.55; // ile trwa rozjeżdżanie; hak tonie dopiero po (HOLD+OPEN)
 // tło sceny zależne od areny bieżącego stage'a (arena-01-surface.png, arena-02-…).
 function arenaBgSrc(globalIndex) { return `assets/arenas/${ARENAS[arenaOf(globalIndex)].bg}-surface.png`; }
 
@@ -83,17 +85,24 @@ function drawFoliage(ctx, fol, W, H, now, part) {
 
 // Kurtyna przejścia: dwa skrzydła zarośli najeżdżają z boków. cover 0..1 (0=poza ekranem,
 // 1=zakryte). Używane przy zarzucie (cover rośnie) i na starcie descentu (cover maleje).
-function drawCurtain(ctx, fol, W, H, cover) {
+// Wybiera asset kurtyny: dedykowany (pełna wysokość) lub fallback (pas trzciny z foliage).
+function drawTransitionCurtain(ctx, W, H, cover) {
   if (cover <= 0) return;
-  const iw = fol.naturalWidth || fol.width, ih = fol.naturalHeight || fol.height;
-  const sy = ih * 0.42, sh = ih * 0.58;          // pas trzciny (dół assetu) — rozciągany na CAŁĄ wysokość
+  const cur = keyedSheet(CURTAIN, true);
+  if (cur) drawCurtain(ctx, cur, W, H, cover, false);          // dedykowany: cały obraz (pełna wysokość)
+  else { const f = keyedSheet(FOLIAGE, true); if (f) drawCurtain(ctx, f, W, H, cover, true); } // fallback: pas trzciny
+}
+function drawCurtain(ctx, im, W, H, cover, bandOnly) {
+  if (cover <= 0) return;
+  const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+  const sy = bandOnly ? ih * 0.42 : 0, sh = bandOnly ? ih * 0.58 : ih; // fallback bierze tylko pas trzciny
   const e = cover * cover * (3 - 2 * cover);     // smoothstep
   const wingW = W * 0.6;                           // skrzydła z zakładem w środku → pełne zakrycie przy cover=1
   const lx = -wingW + e * wingW;                   // lewe: -wingW → 0
   const rx = W - e * wingW;                         // prawe: W → W-wingW
-  ctx.drawImage(fol, 0, sy, iw / 2, sh, lx, 0, wingW, H);        // lewa połowa pasa → pełna wysokość
-  ctx.save(); ctx.translate(rx + wingW, 0); ctx.scale(-1, 1);    // prawe lustrzane
-  ctx.drawImage(fol, iw / 2, sy, iw / 2, sh, 0, 0, wingW, H);
+  ctx.drawImage(im, 0, sy, iw / 2, sh, lx, 0, wingW, H);        // lewa połowa → pełna wysokość
+  ctx.save(); ctx.translate(rx + wingW, 0); ctx.scale(-1, 1);   // prawe lustrzane
+  ctx.drawImage(im, iw / 2, sy, iw / 2, sh, 0, 0, wingW, H);
   ctx.restore();
 }
 const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
@@ -112,7 +121,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b33'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b34'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -412,7 +421,7 @@ function renderHome(ctx, s) {
   ctx.restore(); // koniec panoramy sceny
 
   // kurtyna z krzaków najeżdża z boków przy zarzucie — zakrywa scenę na switch pod wodę
-  if (fol && s.cast) drawCurtain(ctx, fol, W, H, Math.min(1, castPart / 0.8));
+  if (s.cast) drawTransitionCurtain(ctx, W, H, Math.min(1, castPart / 0.85));
 
   // znacznik buildu (mały, w rogu)
   ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = `bold ${Math.round(H * 0.015)}px monospace`; ctx.textAlign = 'left';
@@ -832,10 +841,11 @@ function renderDescent(ctx, s, hookX, hookY) {
   for (let k = 0; k < 3; k++) star(ctx, starsX0 + sgap * (k + 0.5), baseY - 6, starR, k < liveStars);
   ctx.textAlign = 'left';
 
-  // kurtyna reveal: na starcie descentu krzaki są zsunięte (cover=1) i rozjeżdżają się na boki
+  // kurtyna reveal: krzaki trzymają ZAKRYTE (HOLD, "loading"), potem rozjeżdżają się (OPEN)
   if (s.reveal) {
-    const fol = keyedSheet(FOLIAGE, true);
-    if (fol) drawCurtain(ctx, fol, WORLD.W, WORLD.H, Math.max(0, 1 - s.reveal.t / REVEAL_DUR));
+    const t = s.reveal.t;
+    const cover = t < REVEAL_HOLD ? 1 : Math.max(0, 1 - (t - REVEAL_HOLD) / REVEAL_OPEN);
+    drawTransitionCurtain(ctx, WORLD.W, WORLD.H, cover);
   }
 }
 

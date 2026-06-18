@@ -95,9 +95,9 @@ function loop(ts) {
   last = ts;
   if (s.cast) {
     s.cast.t += dt;
-    if (s.cast.t >= CAST_DUR) { s.cast = null; if (startStage(s)) { hookX = WORLD.W / 2; hookY = WORLD.hookStartY; } }
+    if (s.cast.t >= CAST_DUR) { s.cast = null; if (startStage(s)) { hookX = WORLD.W / 2; hookY = WORLD.hookStartY; s.reveal = { t: 0 }; } }
   }
-  if (s.reveal) { s.reveal.t += dt; if (s.reveal.t >= 0.6) s.reveal = null; } // kurtyna rozjechana
+  if (s.reveal) { s.reveal.t += dt; if (s.reveal.t >= 0.85) s.reveal = null; } // HOLD+OPEN; potem hak tonie
   stepDescent(s, hookX, hookY, dt);
   render(ctx, s, hookX, hookY);
   requestAnimationFrame(loop);

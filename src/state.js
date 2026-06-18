@@ -189,7 +189,6 @@ export function startStage(s) {
     for (let k = 0; k < (stage.bag[t] || 0); k++) bag.push(t);
   }
   s.fishQueue = bag;
-  s.reveal = { t: 0 };   // kurtyna startuje zsunięta i rozjeżdża się (maskuje wejście pod wodę)
   s.mode = 'DESCENT';
   return true;
 }
