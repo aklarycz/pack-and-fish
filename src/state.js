@@ -54,6 +54,7 @@ export function createGame() {
     hook: computeHookStats(grid),
     chestReveal: null,    // aktualnie otwierana skrzynka (overlay Home)
     cast: null,           // animacja zarzutu po STARCIE { t } przed zejściem pod wodę
+    reveal: null,         // kurtyna rozjeżdżająca się na starcie descentu { t }
     bpDrag: null,         // przeciągany item w plecaku { fromIdx, id, x, y }
     bpSelected: null,     // akcesorium wybrane do podglądu opisu (id)
     // pola descentu (resetowane w startStage)
@@ -98,7 +99,7 @@ export function closeBackpack(s) {
     s.progress.tutAnchorDone = true; saveProgress(s.progress);  // zobaczył komunikat o połączeniu
   }
 }
-export function returnHome(s) { s.mode = 'HOME'; s.cast = null; }
+export function returnHome(s) { s.mode = 'HOME'; s.cast = null; s.reveal = null; }
 
 // --- plecak: hak (tutorial) + akcesoria ---
 export function placeHook(s, col, row) {
@@ -188,6 +189,7 @@ export function startStage(s) {
     for (let k = 0; k < (stage.bag[t] || 0); k++) bag.push(t);
   }
   s.fishQueue = bag;
+  s.reveal = { t: 0 };   // kurtyna startuje zsunięta i rozjeżdża się (maskuje wejście pod wodę)
   s.mode = 'DESCENT';
   return true;
 }

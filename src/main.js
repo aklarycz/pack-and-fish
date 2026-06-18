@@ -97,6 +97,7 @@ function loop(ts) {
     s.cast.t += dt;
     if (s.cast.t >= CAST_DUR) { s.cast = null; if (startStage(s)) { hookX = WORLD.W / 2; hookY = WORLD.hookStartY; } }
   }
+  if (s.reveal) { s.reveal.t += dt; if (s.reveal.t >= 0.6) s.reveal = null; } // kurtyna rozjechana
   stepDescent(s, hookX, hookY, dt);
   render(ctx, s, hookX, hookY);
   requestAnimationFrame(loop);

@@ -31,11 +31,12 @@ function keyedSheet(src, aggressive = false) {
   // już ma prawdziwą alfę (przezroczysty róg) → tło/kieszenie wycięte przez grafika; nie ruszamy
   if (d[3] < 20) { _keyed[key] = c; return c; }
   const cand = new Uint8Array(N);
+  const lumT = aggressive ? 200 : 225, chrT = aggressive ? 26 : 14; // agresywny łapie też jaśniejszą obwódkę
   for (let p = 0; p < N; p++) {
     if (d[p * 4 + 3] < 20) continue;
     const r = d[p * 4], g = d[p * 4 + 1], b = d[p * 4 + 2];
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    if (lum > 225 && (Math.max(r, g, b) - Math.min(r, g, b)) < 14) cand[p] = 1; // neutralna biel
+    if (lum > lumT && (Math.max(r, g, b) - Math.min(r, g, b)) < chrT) cand[p] = 1; // neutralna biel/obwódka
   }
   if (aggressive) {
     for (let p = 0; p < N; p++) if (cand[p]) d[p * 4 + 3] = 0; // wszystko białe precz
@@ -61,7 +62,8 @@ const FISH_SPRITE = {
   twardziel: 'assets/fish/twardziel.png',
 };
 const BUBBLE_SRC = 'assets/bubble.png';
-const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla (alfa), kołyszą się; rozsuwają przy zarzucie
+const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla; kurtyna przejścia
+const REVEAL_DUR = 0.6; // czas rozjeżdżania się kurtyny na starcie descentu (s)
 // tło sceny zależne od areny bieżącego stage'a (arena-01-surface.png, arena-02-…).
 function arenaBgSrc(globalIndex) { return `assets/arenas/${ARENAS[arenaOf(globalIndex)].bg}-surface.png`; }
 
@@ -76,6 +78,20 @@ function drawFoliage(ctx, fol, W, H, now, part) {
   ctx.transform(1, 0, sway, 1, -sway * H, 0);                  // shear (dół kołysze się najmocniej)
   ctx.drawImage(fol, 0, 0, iw / 2, ih, -off, dy, dw / 2, dh);          // lewa połowa → w lewo
   ctx.drawImage(fol, iw / 2, 0, iw / 2, ih, W / 2 + off, dy, dw / 2, dh); // prawa połowa → w prawo
+  ctx.restore();
+}
+
+// Kurtyna przejścia: dwa skrzydła zarośli najeżdżają z boków. cover 0..1 (0=poza ekranem,
+// 1=zakryte). Używane przy zarzucie (cover rośnie) i na starcie descentu (cover maleje).
+function drawCurtain(ctx, fol, W, H, cover) {
+  if (cover <= 0) return;
+  const e = cover * cover * (3 - 2 * cover);     // smoothstep
+  const wingW = W * 0.62;                          // każde skrzydło (zakład w środku przy cover=1)
+  const lx = -wingW + e * wingW;                   // lewe skrzydło: -wingW → 0
+  const rx = W - e * wingW;                         // prawe skrzydło: W → W-wingW
+  ctx.drawImage(fol, lx, 0, wingW, H);                          // lewe (cover-fit do skrzydła)
+  ctx.save(); ctx.translate(rx + wingW, 0); ctx.scale(-1, 1);   // prawe lustrzane
+  ctx.drawImage(fol, 0, 0, wingW, H);
   ctx.restore();
 }
 const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
@@ -94,7 +110,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b31'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b32'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -211,11 +227,11 @@ function renderHome(ctx, s) {
   const i = s.stageIndex, prog = s.progress.stages[i], unlocked = prog.unlocked;
   const arena = arenaOf(i), local = localOf(i), arenaStart = arena * STAGES_PER_ARENA;
   const A = ARENAS[arena], cx = W / 2;
-  let homeLeft, homeRight, catRect;
+  let homeLeft, homeRight, catRect, start = null, backpack = null, chest = null, stageNodes = [];
 
   // === Kamera „wejścia do wody" przy zarzucie: scena zjeżdża w górę, woda wypełnia od dołu ===
   const castPart = s.cast ? Math.min(1, s.cast.t / CAST_DUR) : 0;
-  const panY = (castPart * castPart * (3 - 2 * castPart)) * H * 0.6; // smoothstep
+  const panY = (castPart * castPart * (3 - 2 * castPart)) * H * 0.7; // scena zjeżdża w górę (góra staje się wodą)
   if (castPart > 0) {
     const wg = ctx.createLinearGradient(0, 0, 0, H);
     wg.addColorStop(0, 'rgb(14,59,92)'); wg.addColorStop(1, 'rgb(4,20,34)');
@@ -237,6 +253,8 @@ function renderHome(ctx, s) {
   g.addColorStop(0, 'rgba(6,18,28,0)'); g.addColorStop(1, 'rgba(6,18,28,0.9)');
   ctx.fillStyle = g; ctx.fillRect(0, H * 0.62, W, H * 0.38);
 
+  // === UI górne (HUD + nazwa areny) — ukryte przy zarzucie ===
+  if (!s.cast) {
   // === A: top HUD (poziom + XP areny + chipy zasobów) ===
   ctx.beginPath(); ctx.arc(W * 0.10, H * 0.045, W * 0.035, 0, Math.PI * 2);
   const lg = ctx.createLinearGradient(0, H * 0.01, 0, H * 0.08); lg.addColorStop(0, '#2e6bb0'); lg.addColorStop(1, '#16406e');
@@ -267,6 +285,7 @@ function renderHome(ctx, s) {
   ctx.fillStyle = '#fff'; ctx.font = `900 ${Math.round(H * 0.036)}px sans-serif`;
   ctx.fillText(A.name, cx, H * 0.148);
   ctx.restore();
+  } // koniec UI górnego
 
   // bohater Tofu — FRONT, śpi; osadzony GŁĘBIEJ na deskach molo (nie na krawędzi) — oba stany
   const baselineY = H * 0.50, catH = H * 0.265, catCy = baselineY - catH * 0.5;
@@ -298,16 +317,18 @@ function renderHome(ctx, s) {
     }
   }
 
-  // przednie zarośla — kołyszą się; przy zarzucie rozsuwają się na boki (zanurzenie)
+  // przednie zarośla — kołyszą się w idle (przy zarzucie zamiast tego kurtyna na overlayu)
   const fol = keyedSheet(FOLIAGE, true); // agresywne keying (zarośla bez białych detali)
-  if (fol) drawFoliage(ctx, fol, W, H, now, s.cast ? Math.min(1, s.cast.t / CAST_DUR) : 0);
+  if (fol && !s.cast) drawFoliage(ctx, fol, W, H, now, 0);
 
+  // === DOLNE UI (pasek stage, przycisk, taby, skrzynka) — ukryte przy zarzucie ===
+  if (!s.cast) {
   // === Pasek wyboru STAGE 1-10 (nad przyciskiem) ===
   const stripY = H * 0.685, m = W * 0.06, usable = W - 2 * m, gap = usable / STAGES_PER_ARENA;
   const nodeR = Math.min(gap * 0.34, H * 0.021);
   ctx.fillStyle = 'rgba(207,226,245,0.55)'; ctx.font = `${Math.round(H * 0.016)}px sans-serif`; ctx.textAlign = 'left';
   ctx.fillText('Stage', m, stripY - nodeR - H * 0.012);
-  const stageNodes = [];
+  stageNodes = [];
   for (let k = 0; k < STAGES_PER_ARENA; k++) {
     const gi = arenaStart + k, st = s.progress.stages[gi];
     const ncx = m + gap * (k + 0.5), sel = k === local;
@@ -343,7 +364,7 @@ function renderHome(ctx, s) {
   ctx.textAlign = 'center'; ctx.fillStyle = canStart ? '#3a1e00' : 'rgba(220,228,238,0.8)';
   ctx.font = `900 ${Math.round(H * 0.038)}px sans-serif`;
   ctx.fillText(unlocked ? `STAGE ${local + 1}` : 'ZABLOKOWANE', cx - (unlocked ? btnH * 0.35 : 0), byy + btnH * 0.64);
-  const start = { x: bx, y: byy, w: btnW, h: btnH };
+  start = { x: bx, y: byy, w: btnW, h: btnH };
   // skrzynka-nagroda za TEN stage, doczepiona do prawej krawędzi przycisku
   if (unlocked) drawStageChest(ctx, bx + btnW - btnH * 0.2, byy + btnH / 2, btnH * 0.62, prog.chestClaimed ? 'claimed' : 'locked');
   if (!s.hook) {
@@ -357,7 +378,7 @@ function renderHome(ctx, s) {
   ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, tabY + 0.5); ctx.lineTo(W, tabY + 0.5); ctx.stroke();
   const tabs = [['Sklep', false], ['Plecak', true], ['Battle', true], ['Łowy', false], ['Kasa', false]];
-  let backpack = null;
+  backpack = null;
   for (let k = 0; k < 5; k++) {
     const tcx = W * (0.10 + 0.20 * k), active = k === 2, functional = tabs[k][1];
     if (active) {
@@ -374,7 +395,6 @@ function renderHome(ctx, s) {
   }
 
   // skrzynka do ODEBRANIA (pending) — pływa po lewej nad paskiem stage
-  let chest = null;
   if (s.progress.pendingChests > 0) {
     chest = { x: W * 0.05, y: H * 0.56, w: W * 0.16, h: W * 0.16 };
     fillRR(ctx, chest.x, chest.y, chest.w, chest.h, 8, '#3a2f12');
@@ -384,8 +404,12 @@ function renderHome(ctx, s) {
     ctx.beginPath(); ctx.arc(chest.x + chest.w, chest.y, 12, 0, Math.PI * 2); ctx.fillStyle = '#ff4d4d'; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(String(s.progress.pendingChests), chest.x + chest.w, chest.y + 5);
   }
+  } // koniec dolnego UI (ukryte przy zarzucie)
 
-  ctx.restore(); // koniec panoramy kamery (UI poniżej rysujemy bez przesunięcia)
+  ctx.restore(); // koniec panoramy sceny
+
+  // kurtyna z krzaków najeżdża z boków przy zarzucie — zakrywa scenę na switch pod wodę
+  if (fol && s.cast) drawCurtain(ctx, fol, W, H, Math.min(1, castPart / 0.8));
 
   // znacznik buildu (mały, w rogu)
   ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = `bold ${Math.round(H * 0.015)}px monospace`; ctx.textAlign = 'left';
@@ -730,19 +754,7 @@ function renderDescent(ctx, s, hookX, hookY) {
   g.addColorStop(0, top); g.addColorStop(1, bot);
   ctx.fillStyle = g; ctx.fillRect(0, 0, WORLD.W, WORLD.H);
 
-  // scena powierzchni (areny bieżącego stage'a) — widoczna u góry, receduje z parallaxem
-  const bg = img(arenaBgSrc(s.stageIndex));
-  if (ready(bg)) {
-    const bw = WORLD.W;
-    const bh = bw * (bg.naturalHeight / bg.naturalWidth);
-    const bottomY = WORLD.H * 0.42 - camY * 0.5; // linia wody @ depth0 ~0.42H, parallax 0.5
-    const fade = Math.max(0, 1 - df * 1.3);       // znika w miarę schodzenia
-    if (fade > 0.01 && bottomY > -bh) {
-      ctx.globalAlpha = fade;
-      ctx.drawImage(bg, 0, bottomY - bh, bw, bh);
-      ctx.globalAlpha = 1;
-    }
-  }
+  // (scena powierzchni usunięta — descent zaczyna się OD RAZU pod wodą; przejście maskuje kurtyna)
   // dodatkowe ściemnienie otoczenia z głębokością (atmosfera głębin)
   if (df > 0) { ctx.fillStyle = `rgba(2,9,16,${(df * 0.55).toFixed(3)})`; ctx.fillRect(0, 0, WORLD.W, WORLD.H); }
 
@@ -816,6 +828,12 @@ function renderDescent(ctx, s, hookX, hookY) {
   const starsX0 = scoreRight + 12;
   for (let k = 0; k < 3; k++) star(ctx, starsX0 + sgap * (k + 0.5), baseY - 6, starR, k < liveStars);
   ctx.textAlign = 'left';
+
+  // kurtyna reveal: na starcie descentu krzaki są zsunięte (cover=1) i rozjeżdżają się na boki
+  if (s.reveal) {
+    const fol = keyedSheet(FOLIAGE, true);
+    if (fol) drawCurtain(ctx, fol, WORLD.W, WORLD.H, Math.max(0, 1 - s.reveal.t / REVEAL_DUR));
+  }
 }
 
 // --- helpery wizualne (bez wpływu na logikę) ---
