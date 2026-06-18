@@ -121,7 +121,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b37'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b38'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -758,21 +758,23 @@ function renderBackpack(ctx, s) {
 function renderDescent(ctx, s, hookX, hookY) {
   const camY = s.depthPx; // świat -> ekran: screenY = worldY - camY
 
-  // gradient głębi — przyciemnia się wraz z głębokością (cue "schodzimy niżej")
-  const df = Math.min(1, s.depthPx / (WORLD.pxPerMeter * 120)); // pełne ściemnienie ~120 m
-  const top = lerpRgb([14, 59, 92], [3, 16, 28], df);
-  const bot = lerpRgb([4, 20, 34], [0, 4, 9], df);
+  // gradient głębi — przyciemnia się wraz z głębokością. df liczone od głębi ABSOLUTNEJ
+  // (lokalna + offset areny) i skalowane do ~55 m, by ciemnienie było WYRAŹNE w grywalnym zakresie.
+  const depthM = s.depthPx / WORLD.pxPerMeter + (s.stageOffsetM || 0);
+  const df = Math.min(1, depthM / 55);
+  const top = lerpRgb([14, 59, 92], [2, 12, 22], df);
+  const bot = lerpRgb([4, 20, 34], [0, 3, 7], df);
   const g = ctx.createLinearGradient(0, 0, 0, WORLD.H);
   g.addColorStop(0, top); g.addColorStop(1, bot);
   ctx.fillStyle = g; ctx.fillRect(0, 0, WORLD.W, WORLD.H);
 
-  // tło podwodne — zapętlone w pionie, przewija się z głębokością (asset gdy wrzucony)
+  // tło podwodne — zapętlone w pionie, przewija się z głębokością (ciemnieje wyraźnie)
   const uw = img(arenaUnderwaterSrc(s.stageIndex));
-  if (ready(uw)) drawScrollTiles(ctx, uw, camY, 0.9 - df * 0.55);
+  if (ready(uw)) drawScrollTiles(ctx, uw, camY, 0.92 - df * 0.78);
 
   // (scena powierzchni usunięta — descent zaczyna się OD RAZU pod wodą; przejście maskuje kurtyna)
   // dodatkowe ściemnienie otoczenia z głębokością (atmosfera głębin)
-  if (df > 0) { ctx.fillStyle = `rgba(2,9,16,${(df * 0.55).toFixed(3)})`; ctx.fillRect(0, 0, WORLD.W, WORLD.H); }
+  if (df > 0) { ctx.fillStyle = `rgba(1,6,12,${(df * 0.7).toFixed(3)})`; ctx.fillRect(0, 0, WORLD.W, WORLD.H); }
 
   // "shader wody": snopy światła z powierzchni (god rays) — animowane, zanikają z głębokością
   const nowD = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
