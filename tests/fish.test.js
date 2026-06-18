@@ -22,10 +22,18 @@ test('patrol fish holds its depth (only gentle bob) and moves horizontally', () 
   assert.ok(Math.abs(f.x - x0) > 20, 'ruszyła się poziomo');
 });
 
-test('aggro fish closes horizontally to hook column with vertical only as bob', () => {
+test('attacker (muskie) closes horizontally to hook column with vertical only as bob', () => {
   const hookX = 300, hookWorldY = 200;
-  const f = { type: 'sredniak', x: 200, y: 200, baseY: undefined, dir: 1, t: 0, phaseX: 0, phaseY: 0, bobAmp: 10, state: 'aggro' };
+  const f = { type: 'twardziel', x: 200, y: 200, baseY: undefined, dir: 1, t: 0, phaseX: 0, phaseY: 0, bobAmp: 10, state: 'aggro' };
   for (let i = 0; i < 80; i++) updateFish(f, hookX, hookWorldY, 0.05, 1, () => 0.9);
-  assert.ok(Math.abs(f.x - hookX) < 20, 'domknęła się poziomo do kolumny haka');
+  assert.ok(Math.abs(f.x - hookX) < 20, 'muskie domknęła się poziomo do kolumny haka');
   assert.ok(Math.abs(f.y - f.baseY) <= 10 + 1e-9, 'pion to tylko bujak, brak darcia w górę');
+});
+
+test('fleeing fish (sum) moves AWAY from the hook when aggro', () => {
+  const hookX = 300, hookWorldY = 200;
+  const f = { type: 'sredniak', x: 280, y: 200, baseY: undefined, dir: 1, t: 0, phaseX: 0, phaseY: 0, bobAmp: 10, state: 'aggro' };
+  const d0 = Math.abs(f.x - hookX);
+  for (let i = 0; i < 20; i++) updateFish(f, hookX, hookWorldY, 0.05, 1, () => 0.9);
+  assert.ok(Math.abs(f.x - hookX) > d0, 'sum oddalił się od haka (ucieka)');
 });

@@ -72,9 +72,13 @@ export const FISH_TYPES = {
   // ruch w bok DOMINOWAŁ nad scrollem opadania → ryby czytają się jak pływające.
   // coins (waluta do merge) oddzielone od scoreValue (do score).
   // okna szersze (łapanie z zapasem, nie "na styk"); radius +30% (większe ryby).
-  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 70,  aggroRange: 130, radius: 21, color: '#7fd1ff', scoreValue: 1, coins: 1 },
-  sredniak:  { id: 'sredniak',  hp: 12, window: 3.4, speed: 85,  aggroRange: 150, radius: 29, color: '#ffd166', scoreValue: 3, coins: 3 },
-  twardziel: { id: 'twardziel', hp: 34, window: 2.4, speed: 100, aggroRange: 170, radius: 39, color: '#ef476f', scoreValue: 6, coins: 8 },
+  // bass (mała): szybka, UCIEKA od haka; łatwa do złapania (niski hp)
+  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 21, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
+  // sum (średnia): wolniejszy, UCIEKA; hp tak dobrane, by bazowy hak (atk8) ledwie zdążył (na styk):
+  // 8·3.4=27.2 dmg; przy głębi stage'a hp rośnie ~×1.36 → 20·1.36≈27 = na styk
+  sredniak:  { id: 'sredniak',  hp: 20, window: 3.4, speed: 72,  aggroRange: 150, radius: 29, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
+  // muskie (duża): ATAKUJE hak, NIE DO ZŁAPANIA bazowym sprzętem (8·2.4=19.2 ≪ 40; z kotwicą 9·2.4=21.6 ≪ 40)
+  twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 39, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };
 
 // Rampa wg głębokości (metry). Wartości interpolowane/progowane w ramp.js.

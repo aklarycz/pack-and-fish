@@ -10,6 +10,9 @@ const ctx = canvas.getContext('2d');
 let s = createGame();
 let hookX = 0;
 let hookY = 0;
+let hookTX = 0; // cel (palec) — hak nadąża z LIMITEM prędkości (manewrowanie spowolnione)
+let hookTY = 0;
+const HOOK_SPEED = 520; // px/s — max prędkość nadążania haka za palcem (3× wolniej niż "skok")
 
 // Dopasuj canvas do okna (portret 3:4) i przelicz layout — niezależnie od rozdzielczości.
 function fitCanvas() {
@@ -24,6 +27,7 @@ function fitCanvas() {
   layoutWorld(w, h);
   hookX = clampHookX(hookX || WORLD.W / 2);
   hookY = clampHookY(hookY || WORLD.hookStartY);
+  hookTX = hookX; hookTY = hookY;
 }
 window.addEventListener('resize', fitCanvas);
 fitCanvas();
@@ -69,11 +73,11 @@ attachInput(canvas, {
     } else if (s.mode === 'END') {
       returnHome(s);
     } else if (s.mode === 'DESCENT') {
-      hookX = clampHookX(x); hookY = clampHookY(y);
+      hookTX = clampHookX(x); hookTY = clampHookY(y); // ustaw cel; hak nadąża z limitem prędkości
     }
   },
   onPointerMove(x, y) {
-    if (s.mode === 'DESCENT') { hookX = clampHookX(x); hookY = clampHookY(y); }
+    if (s.mode === 'DESCENT') { hookTX = clampHookX(x); hookTY = clampHookY(y); }
     else if (s.mode === 'BACKPACK' && s.bpDrag) {
       s.bpDrag.x = x; s.bpDrag.y = y;
       if (Math.hypot(x - s.bpDrag.ox, y - s.bpDrag.oy) > 10) s.bpDrag.moved = true;
@@ -95,9 +99,15 @@ function loop(ts) {
   last = ts;
   if (s.cast) {
     s.cast.t += dt;
-    if (s.cast.t >= CAST_DUR) { s.cast = null; if (startStage(s)) { hookX = WORLD.W / 2; hookY = WORLD.hookStartY; s.reveal = { t: 0 }; } }
+    if (s.cast.t >= CAST_DUR) { s.cast = null; if (startStage(s)) { hookX = hookTX = WORLD.W / 2; hookY = hookTY = WORLD.hookStartY; s.reveal = { t: 0 }; } }
   }
   if (s.reveal) { s.reveal.t += dt; if (s.reveal.t >= 0.85) s.reveal = null; } // HOLD+OPEN; potem hak tonie
+  // hak nadąża za palcem z LIMITEM prędkości (spowolnione manewrowanie)
+  if (s.mode === 'DESCENT' && !s.reveal) {
+    const mx = HOOK_SPEED * dt;
+    hookX += Math.max(-mx, Math.min(mx, hookTX - hookX));
+    hookY += Math.max(-mx, Math.min(mx, hookTY - hookY));
+  }
   stepDescent(s, hookX, hookY, dt);
   render(ctx, s, hookX, hookY);
   requestAnimationFrame(loop);

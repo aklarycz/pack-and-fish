@@ -44,10 +44,17 @@ export function updateFish(fish, hookX, hookWorldY, dt, speedMul, rng = Math.ran
   } else if (fish.state === 'aggro') {
     // poza zasięgiem → wraca do patrolu (nie ciągnie się za hakiem w nieskończoność)
     if (!inAggroRange(fish, hookX, hookWorldY)) { fish.state = 'patrol'; return; }
-    // natarcie GŁÓWNIE poziome: dopływa do kolumny haka. Pion zostawiamy
-    // opadającemu hakowi (który i tak schodzi przez głębokość ryby) — tylko bujak.
     const dx = hookX - fish.x;
-    fish.x += Math.sign(dx) * Math.min(Math.abs(dx), speed * indiv * 1.3 * dt);
+    if (t.behavior === 'attack') {
+      // muskie: natarcie poziome do kolumny haka (atakuje)
+      fish.x += Math.sign(dx) * Math.min(Math.abs(dx), speed * indiv * 1.3 * dt);
+      if (dx !== 0) fish.dir = Math.sign(dx);
+    } else {
+      // bass/sum: UCIEKA — odpływa od haka (gracz musi go zapędzić)
+      const away = dx === 0 ? fish.dir : -Math.sign(dx);
+      fish.x += away * speed * indiv * dt;
+      fish.dir = away;
+    }
     fish.y = fish.baseY + Math.sin(fish.t * 2.0 + (fish.phaseY || 0)) * (fish.bobAmp || 6) * 0.4;
   }
 }

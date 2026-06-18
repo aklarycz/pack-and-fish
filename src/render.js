@@ -2,7 +2,7 @@ import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, CAS
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
-const ASSET_VER = 'b37'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
+const ASSET_VER = 'b40'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
 const _imgCache = {};
 function img(src) {
   let im = _imgCache[src];
@@ -56,10 +56,30 @@ function keyedSheet(src, aggressive = false) {
   cc.putImageData(id, 0, 0);
   _keyed[key] = c; return c;
 }
+// Keying przez FLOOD-FILL od krawędzi: usuwa jasne tło (też wypalony checker) połączone z
+// brzegiem, zatrzymując się na ciemnym konturze — wnętrze (jasny brzuch/srebro) zostaje. Dla ryb.
+const _keyedE = {};
+function keyedEdge(src) {
+  const im = img(src); if (!ready(im)) return null;
+  if (_keyedE[src]) return _keyedE[src];
+  const w = im.naturalWidth, h = im.naturalHeight;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const cc = c.getContext('2d'); cc.drawImage(im, 0, 0);
+  let id; try { id = cc.getImageData(0, 0, w, h); } catch (e) { _keyedE[src] = im; return im; }
+  const d = id.data;
+  if (d[3] < 20) { _keyedE[src] = c; return c; } // już ma alfę
+  const seen = new Uint8Array(w * h), st = [];
+  const lum = (p) => 0.299 * d[p * 4] + 0.587 * d[p * 4 + 1] + 0.114 * d[p * 4 + 2];
+  const push = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const p = y * w + x; if (seen[p] || lum(p) < 175) return; seen[p] = 1; st.push(p); };
+  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+  for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+  while (st.length) { const p = st.pop(); d[p * 4 + 3] = 0; const x = p % w, y = (p / w) | 0; push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1); }
+  cc.putImageData(id, 0, 0); _keyedE[src] = c; return c;
+}
 const FISH_SPRITE = {
-  plotka: 'assets/fish/plotka.png',
-  sredniak: 'assets/fish/sredniak.png',
-  twardziel: 'assets/fish/twardziel.png',
+  plotka: 'assets/fish/bass.png',       // mała = bass
+  sredniak: 'assets/fish/sum.png',      // średnia = sum
+  twardziel: 'assets/fish/muskie.png',  // duża = muskie
 };
 const BUBBLE_SRC = 'assets/bubble.png';
 const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla (Home) + fallback kurtyny
@@ -121,15 +141,19 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b39'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b41'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
-function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
+// Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
+// (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
+function drawFishSprite(ctx, im, cx, cy, radius, sx, alpha, tilt, dark) {
   const w = radius * SPRITE_SCALE;
-  const h = w * (im.naturalHeight / im.naturalWidth);
+  const h = w * ((im.naturalHeight || im.height) / (im.naturalWidth || im.width));
   ctx.save();
   ctx.globalAlpha = alpha;
+  if (dark > 0 && 'filter' in ctx) ctx.filter = `brightness(${(1 - dark).toFixed(3)})`;
   ctx.translate(cx, cy);
-  if (dir < 0) ctx.scale(-1, 1); // sprite'y patrzą w prawo; ruch w lewo = odbicie
+  if (tilt) ctx.rotate(tilt);
+  ctx.scale(sx < 0 ? -Math.max(0.04, -sx) : Math.max(0.04, sx), 1); // |sx|→0 przy zawracaniu (sprite patrzy w prawo)
   ctx.drawImage(im, -w / 2, -h / 2, w, h);
   ctx.restore();
 }
@@ -789,9 +813,11 @@ function renderDescent(ctx, s, hookX, hookY) {
     const sy = f.y - camY;
     if (sy < -60 || sy > WORLD.H + 60) continue;
     const t = FISH_TYPES[f.type];
-    const im = img(FISH_SPRITE[f.type]);
-    if (ready(im)) {
-      drawFishSprite(ctx, im, f.x, sy, t.radius, f.dir, 1);
+    const im = keyedEdge(FISH_SPRITE[f.type]);
+    if (im) {
+      f._sx = (f._sx === undefined ? f.dir : f._sx + (f.dir - f._sx) * 0.12); // płynne zawracanie (scaleX przez 0)
+      const tilt = Math.sin(nowD * 1.6 + (f.phaseX || 0)) * 0.06;             // delikatne kołysanie ciała
+      drawFishSprite(ctx, im, f.x, sy, t.radius, f._sx, 1, tilt, df * 0.7);   // ciemnieje z głębokością
     } else {
       ctx.fillStyle = t.color; ctx.beginPath(); ctx.arc(f.x, sy, t.radius, 0, Math.PI * 2); ctx.fill();
     }
@@ -808,8 +834,8 @@ function renderDescent(ctx, s, hookX, hookY) {
     const sy = b.bubbleY - camY;
     if (sy < -60 || sy > WORLD.H + 60) continue;
     const t = FISH_TYPES[b.type];
-    const fim = img(FISH_SPRITE[b.type]);
-    if (ready(fim)) drawFishSprite(ctx, fim, b.x, sy, t.radius * 0.8, b.dir, 0.9);
+    const fim = keyedEdge(FISH_SPRITE[b.type]);
+    if (fim) drawFishSprite(ctx, fim, b.x, sy, t.radius * 0.8, b.dir, 0.9, 0, df * 0.7);
     const bim = img(BUBBLE_SRC);
     if (ready(bim)) {
       const d = t.radius * 3.4;
