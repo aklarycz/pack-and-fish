@@ -1,4 +1,4 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, CAST_ANIM, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
@@ -85,13 +85,15 @@ function drawFoliage(ctx, fol, W, H, now, part) {
 // 1=zakryte). Używane przy zarzucie (cover rośnie) i na starcie descentu (cover maleje).
 function drawCurtain(ctx, fol, W, H, cover) {
   if (cover <= 0) return;
+  const iw = fol.naturalWidth || fol.width, ih = fol.naturalHeight || fol.height;
+  const sy = ih * 0.42, sh = ih * 0.58;          // pas trzciny (dół assetu) — rozciągany na CAŁĄ wysokość
   const e = cover * cover * (3 - 2 * cover);     // smoothstep
-  const wingW = W * 0.62;                          // każde skrzydło (zakład w środku przy cover=1)
-  const lx = -wingW + e * wingW;                   // lewe skrzydło: -wingW → 0
-  const rx = W - e * wingW;                         // prawe skrzydło: W → W-wingW
-  ctx.drawImage(fol, lx, 0, wingW, H);                          // lewe (cover-fit do skrzydła)
-  ctx.save(); ctx.translate(rx + wingW, 0); ctx.scale(-1, 1);   // prawe lustrzane
-  ctx.drawImage(fol, 0, 0, wingW, H);
+  const wingW = W * 0.6;                           // skrzydła z zakładem w środku → pełne zakrycie przy cover=1
+  const lx = -wingW + e * wingW;                   // lewe: -wingW → 0
+  const rx = W - e * wingW;                         // prawe: W → W-wingW
+  ctx.drawImage(fol, 0, sy, iw / 2, sh, lx, 0, wingW, H);        // lewa połowa pasa → pełna wysokość
+  ctx.save(); ctx.translate(rx + wingW, 0); ctx.scale(-1, 1);    // prawe lustrzane
+  ctx.drawImage(fol, iw / 2, sy, iw / 2, sh, 0, 0, wingW, H);
   ctx.restore();
 }
 const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
@@ -110,7 +112,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b32'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b33'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -229,8 +231,9 @@ function renderHome(ctx, s) {
   const A = ARENAS[arena], cx = W / 2;
   let homeLeft, homeRight, catRect, start = null, backpack = null, chest = null, stageNodes = [];
 
-  // === Kamera „wejścia do wody" przy zarzucie: scena zjeżdża w górę, woda wypełnia od dołu ===
-  const castPart = s.cast ? Math.min(1, s.cast.t / CAST_DUR) : 0;
+  // === Po animacji zarzutu (CAST_ANIM) kamera zjeżdża w górę + woda; kurtyna z krzaków zakrywa ===
+  const diveT = s.cast ? Math.max(0, Math.min(1, (s.cast.t - CAST_ANIM) / (CAST_DUR - CAST_ANIM))) : 0;
+  const castPart = diveT; // używane przez pan/kurtynę (zjazd zaczyna się dopiero po animacji)
   const panY = (castPart * castPart * (3 - 2 * castPart)) * H * 0.7; // scena zjeżdża w górę (góra staje się wodą)
   if (castPart > 0) {
     const wg = ctx.createLinearGradient(0, 0, 0, H);
@@ -295,7 +298,7 @@ function renderHome(ctx, s) {
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   const castSheet = keyedSheet(CAT_CAST_SHEET);
   if (s.cast && castSheet) {
-    const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
+    const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_ANIM * CAT_FRAMES));
     // cast to inny asset (sheet) — CAST_FIT zrównuje rozmiar kota z pozą śpiącą (różne kadrowanie)
     drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH * CAST_FIT);
   } else if (!s.cast && keyedSheet(CAT_FRONT_SLEEP)) {
@@ -310,7 +313,7 @@ function renderHome(ctx, s) {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
       const opt = {};
-      if (s.cast) { const p = Math.min(1, s.cast.t / CAST_DUR); opt.scale = 1 + 0.1 * Math.sin(p * Math.PI); opt.dy = -H * 0.015 * Math.sin(p * Math.PI); }
+      if (s.cast) { const p = Math.min(1, s.cast.t / CAST_ANIM); opt.scale = 1 + 0.1 * Math.sin(p * Math.PI); opt.dy = -H * 0.015 * Math.sin(p * Math.PI); }
       else { const b = Math.sin(now * 1.8); opt.dy = b * H * 0.012; opt.tilt = Math.sin(now * 0.9) * 0.05; opt.scaleX = 1 - b * 0.03; opt.scaleY = 1 + b * 0.03; }
       drawImageCentered(ctx, catIm, cx, catCy, catH, opt);
       if (!s.cast) drawDozeZ(ctx, cx + catH * 0.34, catCy - catH * 0.42, now);

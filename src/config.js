@@ -61,8 +61,10 @@ export const ITEMS = {
 // Nagroda ze skrzynki za ukończenie stage (≥1★). Pierwsza skrzynka wymusza Kotwicę.
 export const CHEST_SC = 120;
 
-// Czas animacji zarzutu kota (s) po STARCIE, zanim zejdziemy pod wodę.
-export const CAST_DUR = 1.0;
+// Czas całej sekwencji po STARCIE (s): najpierw animacja zarzutu Tofu (CAST_ANIM),
+// potem zjazd kamery + kurtyna z krzaków, na końcu zejście pod wodę.
+export const CAST_DUR = 1.9;
+export const CAST_ANIM = 1.2; // ile z tego trwa sama animacja zarzutu (reszta = zjazd/kurtyna)
 
 // 3 archetypy: jedna oś = HP vs okno. scoreValue liczy się przy ogłuszeniu.
 export const FISH_TYPES = {
