@@ -20,7 +20,7 @@ test('carouselMove clamps to stage range', () => {
   const s = createGame();
   carouselMove(s, -1); assert.equal(s.stageIndex, 0);
   carouselMove(s, 1); assert.equal(s.stageIndex, 1);
-  for (let i = 0; i < 10; i++) carouselMove(s, 1);
+  for (let i = 0; i < STAGES.length + 5; i++) carouselMove(s, 1);
   assert.equal(s.stageIndex, STAGES.length - 1);
 });
 

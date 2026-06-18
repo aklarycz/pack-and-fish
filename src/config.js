@@ -102,26 +102,64 @@ export const SCORE = {
 // Domyślne progi gwiazdek (fallback). T1 > depthCeil (gwarancja: sama głębia < 1★).
 export const STARS = { t1: 80, t2: 200, t3: 380 };
 
-// Stage'y (plaster 2 — meta). Balans wg specu ekonomii:
-// - bag = dokładny worek ryb (gwarantuje max score), spawnowany easy->hard;
-// - spawn = krzywa interwału { start, min, perM } dopasowana do maxLatch;
-// - depthCap = sufit wkładu głębi do score; stars = progi (3★ ≈ perfekcja).
-// Stage 1 MUSI być 3★-owalny bazowym hakiem (kotwica jest dopiero z jego skrzyni),
-// dlatego brak twardziela i stały, "łapalny" interwał.
-export const STAGES = [
-  { id: 1, name: 'Przybrzeże', difficultyOffsetM: 0,
-    bag: { plotka: 10, sredniak: 6, twardziel: 0 },
-    spawn: { start: 2.3, min: 2.3, perM: 0 },
-    depthCap: 30, stars: { t1: 180, t2: 245, t3: 290 } },
-  { id: 2, name: 'Toń',        difficultyOffsetM: 20,
-    bag: { plotka: 6, sredniak: 10, twardziel: 6 },
-    spawn: { start: 1.6, min: 1.2, perM: 0.01 },
-    depthCap: 45, stars: { t1: 445, t2: 600, t3: 720 } },
-  { id: 3, name: 'Głębia',     difficultyOffsetM: 45,
-    bag: { plotka: 4, sredniak: 12, twardziel: 12 },
-    spawn: { start: 1.3, min: 0.9, perM: 0.012 },
-    depthCap: 60, stars: { t1: 690, t2: 940, t3: 1110 } },
+// === ARENY × STAGE'Y (plaster 2 — meta) ===
+// Arena = temat wizualny Home (tło + Tofu) i grupa 10 stage'y. Przełączanie stage'y
+// w obrębie areny NIE zmienia sceny — zmienia ją dopiero przejście do innej areny.
+// Wewnętrznie trzymamy PŁASKĄ listę STAGES (30 = 3 areny × 10): unlock/progres liczą się
+// po globalnym indeksie (stage N+1 odblokowuje się po ≥1★ na N, także przez granicę areny).
+export const STAGES_PER_ARENA = 10;
+
+// Progi gwiazdek jako UŁAMKI teoretycznego maxa worka (depthCap + Σ scoreValue·wStun).
+// 3★ ≈ 93% (złap prawie wszystko) — spójne i zawsze osiągalne, bez ręcznego strojenia.
+const STAR_FRAC = { t1: 0.58, t2: 0.79, t3: 0.93 };
+
+// Generuje 10 stage'y areny ze skalowanej bazy. TYLKO plotka+sredniak — twardziel jest
+// nieubijalny obecnym sprzętem (hp34 > atk·okno nawet z kotwicą), więc każdy stage da się
+// wyczyścić. Twardziel wróci, gdy dojdą mocniejsze haki/akcesoria.
+// UWAGA: balans stage'y 2-10 jest heurystyczny (skalowanie) — stage 1 trzyma sprawdzone liczby.
+function buildArenaStages(base, arena) {
+  const stages = [];
+  for (let i = 0; i < STAGES_PER_ARENA; i++) {
+    const mult = 1 + i * 0.10;
+    const plotka = Math.round(base.plotka * mult);
+    const sredniak = Math.round(base.sredniak * mult);
+    const bag = { plotka, sredniak, twardziel: 0 };
+    const difficultyOffsetM = base.offsetM + i * 2;
+    const depthCap = base.depthCap + i * 2;
+    const start = Math.max(base.spawnMin, base.spawnStart - i * 0.05);
+    const maxScore = depthCap +
+      (plotka * FISH_TYPES.plotka.scoreValue + sredniak * FISH_TYPES.sredniak.scoreValue) * SCORE.wStun;
+    stages.push({
+      arenaId: arena.id, arenaName: arena.name, bg: arena.bg, no: i + 1,
+      difficultyOffsetM, bag, spawn: { start, min: start, perM: base.perM }, depthCap,
+      stars: {
+        t1: Math.round(maxScore * STAR_FRAC.t1),
+        t2: Math.round(maxScore * STAR_FRAC.t2),
+        t3: Math.round(maxScore * STAR_FRAC.t3),
+      },
+    });
+  }
+  return stages;
+}
+
+// 3 areny. `bg` = prefiks assetu sceny (arena-01-surface.png itd.). Tylko arena-01 ma art;
+// pozostałe pokazują tintowany fallback do czasu dodania grafik.
+export const ARENAS = [
+  { id: 1, name: 'Przybrzeże', bg: 'arena-01', tint: ['#16406e', '#0b2138'],
+    base: { plotka: 10, sredniak: 6,  offsetM: 0,  depthCap: 30, spawnStart: 2.3, spawnMin: 2.3, perM: 0 } },
+  { id: 2, name: 'Toń',        bg: 'arena-02', tint: ['#114b5f', '#06222b'],
+    base: { plotka: 12, sredniak: 10, offsetM: 12, depthCap: 40, spawnStart: 1.9, spawnMin: 1.4, perM: 0.008 } },
+  { id: 3, name: 'Głębia',     bg: 'arena-03', tint: ['#2a2a5e', '#0a0a22'],
+    base: { plotka: 10, sredniak: 16, offsetM: 25, depthCap: 50, spawnStart: 1.6, spawnMin: 1.1, perM: 0.01 } },
 ];
+export const ARENA_COUNT = ARENAS.length;
+
+// Płaska lista wszystkich stage'y (index globalny = arena*10 + lokalny).
+export const STAGES = ARENAS.flatMap(a => buildArenaStages(a.base, a));
+
+// Pomocniki mapowania global<->arena/lokalny.
+export function arenaOf(globalIndex) { return Math.floor(globalIndex / STAGES_PER_ARENA); }
+export function localOf(globalIndex) { return globalIndex % STAGES_PER_ARENA; }
 
 export const BACKPACK = {
   cols: 3,

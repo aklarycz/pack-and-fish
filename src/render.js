@@ -1,4 +1,4 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
@@ -38,8 +38,8 @@ const FISH_SPRITE = {
   twardziel: 'assets/fish/twardziel.png',
 };
 const BUBBLE_SRC = 'assets/bubble.png';
-const BG_SURFACE = 'assets/arenas/arena-01-surface.png';
-const FOLIAGE = 'assets/arenas/arena-01-foliage.png';
+// tło sceny zależne od areny bieżącego stage'a (arena-01-surface.png, arena-02-…).
+function arenaBgSrc(globalIndex) { return `assets/arenas/${ARENAS[arenaOf(globalIndex)].bg}-surface.png`; }
 const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
 const CAT_FRONT_CAST = 'assets/cat/cat-front-cast.png';
 // sheety klatkowe w siatce 3x3 (9 klatek; priorytet nad pozą+tween jeśli istnieją).
@@ -102,7 +102,7 @@ function drawTutorial(ctx, s) {
     if (!s.hook) { target = rectCenter(h.backpack); text = 'Otwórz plecak — załóż hak'; }
     else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { target = rectCenter(h.backpack); text = 'Masz Kotwicę! Otwórz plecak'; }
     else if (s.progress.pendingChests > 0 && !s.progress.gotAnchor && h.chest) { target = rectCenter(h.chest); text = 'Otwórz skrzynię!'; }
-    else if (!s.progress.gotAnchor && s.progress.stages[0].stars === 0 && h.start) { target = rectCenter(h.start); text = 'Tap START, by zarzucić'; }
+    else if (!s.progress.gotAnchor && s.progress.stages[0].stars === 0 && h.start) { target = rectCenter(h.start); text = 'Tap, by zarzucić wędkę'; }
   } else if (s.mode === 'BACKPACK') {
     const gi = s._grid;
     if (!s.hook && gi) { target = rectCenter(tutCellRect(gi, 4)); text = 'Tap pole, by włożyć hak'; }
@@ -162,77 +162,73 @@ function tutArrow(ctx, x1, y1, x2, y2) {
   ctx.closePath(); ctx.fillStyle = '#ffcb45'; ctx.fill(); ctx.lineCap = 'butt';
 }
 
-// --- HOME: layout wg specu UI (strefy A–F, scrimy, glass, START dominuje) ---
+// --- HOME: arena (góra, scena/Tofu per-arena) + pasek stage 1-10 nad przyciskiem ---
 function renderHome(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
   const i = s.stageIndex, prog = s.progress.stages[i], unlocked = prog.unlocked;
-  const cx = W / 2;
-  let homeLeft, homeRight, catRect; // rect-y do hit-testu (wybór stage + kot)
+  const arena = arenaOf(i), local = localOf(i), arenaStart = arena * STAGES_PER_ARENA;
+  const A = ARENAS[arena], cx = W / 2;
+  let homeLeft, homeRight, catRect;
 
-  // 1. tło (pełnoekranowy PNG) 2. vignette 3/4. scrimy
-  ctx.fillStyle = '#0b1f33'; ctx.fillRect(0, 0, W, H);
-  const bg = img(BG_SURFACE);
-  if (ready(bg)) drawCover(ctx, bg, 0, 0, W, H);
+  // 1. tło sceny areny (PNG jeśli jest, inaczej tintowany fallback per arena) 2. vignette 3/4. scrimy
+  const bg = img(arenaBgSrc(i));
+  if (ready(bg)) { ctx.fillStyle = '#0b1f33'; ctx.fillRect(0, 0, W, H); drawCover(ctx, bg, 0, 0, W, H); }
+  else { const tg = ctx.createLinearGradient(0, 0, 0, H); tg.addColorStop(0, A.tint[0]); tg.addColorStop(1, A.tint[1]); ctx.fillStyle = tg; ctx.fillRect(0, 0, W, H); }
   const vg = ctx.createRadialGradient(cx, H * 0.45, H * 0.2, cx, H * 0.45, H * 0.72);
   vg.addColorStop(0, 'rgba(6,18,28,0)'); vg.addColorStop(1, 'rgba(6,18,28,0.45)');
   ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
   let g = ctx.createLinearGradient(0, 0, 0, H * 0.12);
   g.addColorStop(0, 'rgba(6,18,28,0.55)'); g.addColorStop(1, 'rgba(6,18,28,0)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H * 0.12);
-  g = ctx.createLinearGradient(0, H * 0.80, 0, H);
-  g.addColorStop(0, 'rgba(6,18,28,0)'); g.addColorStop(1, 'rgba(6,18,28,0.85)');
-  ctx.fillStyle = g; ctx.fillRect(0, H * 0.80, W, H * 0.2);
+  g = ctx.createLinearGradient(0, H * 0.62, 0, H);
+  g.addColorStop(0, 'rgba(6,18,28,0)'); g.addColorStop(1, 'rgba(6,18,28,0.9)');
+  ctx.fillStyle = g; ctx.fillRect(0, H * 0.62, W, H * 0.38);
 
-  // === Stage select — kompaktowy pasek u góry (wyspy-ikony przeniesione na mapę aren) ===
-  g = ctx.createLinearGradient(0, H * 0.095, 0, H * 0.215);
-  g.addColorStop(0, 'rgba(10,22,32,0)'); g.addColorStop(1, 'rgba(10,22,32,0.4)');
-  ctx.fillStyle = g; ctx.fillRect(0, H * 0.095, W, H * 0.12);
-  const ar = W * 0.05, arCy = H * 0.135;
-  homeLeft = { x: W * 0.04, y: arCy - ar, w: ar * 2, h: ar * 2 };
-  homeRight = { x: W - W * 0.04 - ar * 2, y: arCy - ar, w: ar * 2, h: ar * 2 };
-  navArrow(ctx, homeLeft.x + ar, arCy, ar, -1, i > 0);
-  navArrow(ctx, homeRight.x + ar, arCy, ar, 1, i < STAGES.length - 1);
-  ctx.textAlign = 'center';
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = H * 0.002;
-  ctx.fillStyle = '#fff'; ctx.font = `900 ${Math.round(H * 0.034)}px sans-serif`;
-  ctx.fillText(`${STAGES[i].id}. ${STAGES[i].name}`, cx, H * 0.142);
-  ctx.restore();
-  const starR = W * 0.022, sgap = W * 0.012, sw = starR * 2, starsW = 3 * sw + 2 * sgap;
-  for (let k = 0; k < 3; k++) star(ctx, cx - starsW / 2 + sw / 2 + k * (sw + sgap), H * 0.172, starR * (k === 1 ? 1.1 : 1), k < prog.stars);
-  ctx.fillStyle = unlocked ? '#c8d4de' : '#ffd166'; ctx.font = `${Math.round(H * 0.02)}px sans-serif`;
-  ctx.fillText(unlocked ? 'Best: ' + prog.bestScore + ' pkt' : 'ZABLOKOWANE', cx, H * 0.198);
-
-  // === A: top HUD (poziom + XP + chipy zasobów) ===
+  // === A: top HUD (poziom + XP areny + chipy zasobów) ===
   ctx.beginPath(); ctx.arc(W * 0.10, H * 0.045, W * 0.035, 0, Math.PI * 2);
   const lg = ctx.createLinearGradient(0, H * 0.01, 0, H * 0.08); lg.addColorStop(0, '#2e6bb0'); lg.addColorStop(1, '#16406e');
   ctx.fillStyle = lg; ctx.fill(); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 2; ctx.stroke();
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(H * 0.030)}px sans-serif`;
   ctx.fillText('1', W * 0.10, H * 0.045 + H * 0.011);
-  const totalStars = s.progress.stages.reduce((a, st) => a + st.stars, 0);
-  const xpFrac = Math.max(0.12, totalStars / (STAGES.length * 3));
+  // XP bar = gwiazdki bieżącej areny / 30 (10 stage'y × 3★)
+  const arenaStars = s.progress.stages.slice(arenaStart, arenaStart + STAGES_PER_ARENA).reduce((a, st) => a + st.stars, 0);
+  const xpFrac = Math.max(0.06, arenaStars / (STAGES_PER_ARENA * 3));
   const xpX = W * 0.155, xpY = H * 0.046, xpW = W * 0.20, xpH = H * 0.013;
   fillRR(ctx, xpX, xpY, xpW, xpH, xpH / 2, 'rgba(14,34,51,0.6)');
-  if (xpFrac > 0) fillRR(ctx, xpX, xpY, xpW * xpFrac, xpH, xpH / 2, '#52d0ff');
-  // chipy (energia / gemy / złoto) — prawy align do 0.95W
+  fillRR(ctx, xpX, xpY, xpW * xpFrac, xpH, xpH / 2, '#52d0ff');
   const chW = W * 0.165, chH = H * 0.046, chU = H * 0.012, chY = H * 0.046;
-  chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', String(s.progress.coins)); // złoto = realne monety
-  chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');          // gemy (placeholder)
-  chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');    // energia (brak gate'u)
+  chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', String(s.progress.coins));
+  chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');
+  chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');
 
-  // bohater Tofu — FRONT, siedzi na molo (stopy ~0.55H), woda przed nim
-  const baselineY = H * 0.55, cellH = H * 0.32, catCy = baselineY - cellH * 0.45, catH = cellH;
-  catRect = { x: cx - W * 0.24, y: baselineY - cellH * 0.9, w: W * 0.48, h: cellH * 0.9 };
+  // === Nazwa ARENY (góra) — strzałki przełączają ARENĘ (zmieniają scenę) ===
+  const ar = W * 0.05, arCy = H * 0.135;
+  homeLeft = { x: W * 0.04, y: arCy - ar, w: ar * 2, h: ar * 2 };
+  homeRight = { x: W - W * 0.04 - ar * 2, y: arCy - ar, w: ar * 2, h: ar * 2 };
+  navArrow(ctx, homeLeft.x + ar, arCy, ar, -1, arena > 0);
+  navArrow(ctx, homeRight.x + ar, arCy, ar, 1, arena < ARENA_COUNT - 1);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#9fd0ff'; ctx.font = `bold ${Math.round(H * 0.018)}px sans-serif`;
+  ctx.fillText(`ARENA ${A.id}`, cx, H * 0.108);
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = H * 0.002;
+  ctx.fillStyle = '#fff'; ctx.font = `900 ${Math.round(H * 0.036)}px sans-serif`;
+  ctx.fillText(A.name, cx, H * 0.148);
+  ctx.restore();
+
+  // bohater Tofu — FRONT, siedzi na molo (mniejszy, stopy ~0.54H)
+  const baselineY = H * 0.54, cellH = H * 0.28, catCy = baselineY - cellH * 0.45, catH = cellH;
+  catRect = { x: cx - W * 0.20, y: baselineY - cellH * 0.9, w: W * 0.40, h: cellH * 0.9 };
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.14, H * 0.011, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.12, H * 0.010, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
-  if (s.cast && castSheet) {                       // klatki: cast (stabilizowane)
+  if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
     drawSheetStable(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, cellH);
-  } else if (!s.cast && idleSheet) {               // klatki: idle (pętla wolniejsza, stabilizowana)
-    const f = Math.floor(now * 1000 / 230) % CAT_FRAMES;
+  } else if (!s.cast && idleSheet) {
+    const f = Math.floor(now * 1000 / 260) % CAT_FRAMES; // wolniej = spokojniej
     drawSheetStable(ctx, CAT_IDLE_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, cellH);
-  } else {                                         // fallback: pojedyncza poza + tween z kodu
+  } else {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
       const opt = {};
@@ -242,24 +238,54 @@ function renderHome(ctx, s) {
       if (!s.cast) drawDozeZ(ctx, cx + catH * 0.34, catCy - catH * 0.42, now);
     }
   }
-  // (warstwa listowia wyłączona — nowe tło areny ma własny pierwszy plan)
 
-  // === D: START ===
-  const btnW = W * 0.66, btnH = H * 0.092, bx = cx - btnW / 2, byy = H * 0.80 - btnH / 2;
+  // === Pasek wyboru STAGE 1-10 (nad przyciskiem) ===
+  const stripY = H * 0.685, m = W * 0.06, usable = W - 2 * m, gap = usable / STAGES_PER_ARENA;
+  const nodeR = Math.min(gap * 0.34, H * 0.021);
+  ctx.fillStyle = 'rgba(207,226,245,0.55)'; ctx.font = `${Math.round(H * 0.016)}px sans-serif`; ctx.textAlign = 'left';
+  ctx.fillText('Stage', m, stripY - nodeR - H * 0.012);
+  const stageNodes = [];
+  for (let k = 0; k < STAGES_PER_ARENA; k++) {
+    const gi = arenaStart + k, st = s.progress.stages[gi];
+    const ncx = m + gap * (k + 0.5), sel = k === local;
+    ctx.beginPath(); ctx.arc(ncx, stripY, nodeR, 0, Math.PI * 2);
+    if (!st.unlocked) ctx.fillStyle = 'rgba(40,58,74,0.85)';
+    else if (st.stars > 0) ctx.fillStyle = '#caa23a';
+    else ctx.fillStyle = '#2e6bb0';
+    ctx.fill();
+    if (sel) { ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke(); }
+    else { ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.stroke(); }
+    if (!st.unlocked) { drawLock(ctx, ncx, stripY, nodeR * 0.8); }
+    else {
+      ctx.fillStyle = st.stars > 0 ? '#06121f' : '#eaf4ff'; ctx.textAlign = 'center';
+      ctx.font = `bold ${Math.round(nodeR * 1.05)}px sans-serif`;
+      ctx.fillText(String(k + 1), ncx, stripY + nodeR * 0.38);
+    }
+    stageNodes.push({ rect: { x: ncx - gap / 2, y: stripY - nodeR - 6, w: gap, h: nodeR * 2 + 12 }, index: gi });
+  }
+
+  // gwiazdki WYBRANEGO stage'a (nad przyciskiem)
+  const ssR = W * 0.024, ssg = W * 0.014, ssw = ssR * 2, starsW = 3 * ssw + 2 * ssg;
+  for (let k = 0; k < 3; k++) star(ctx, cx - starsW / 2 + ssw / 2 + k * (ssw + ssg), H * 0.735, ssR * (k === 1 ? 1.1 : 1), k < prog.stars);
+
+  // === Przycisk STAGE N (zamiast START) + wskaźnik skrzynki-nagrody (locked/claimed) ===
+  const btnW = W * 0.62, btnH = H * 0.09, bx = cx - btnW / 2, byy = H * 0.80 - btnH / 2;
   const canStart = unlocked && s.hook;
   fillRR(ctx, bx, byy + H * 0.006, btnW, btnH, btnH / 2, 'rgba(0,0,0,0.28)');
   rrPath(ctx, bx, byy, btnW, btnH, btnH / 2);
   if (canStart) { const sg = ctx.createLinearGradient(0, byy, 0, byy + btnH); sg.addColorStop(0, '#ffb627'); sg.addColorStop(1, '#ff8a00'); ctx.fillStyle = sg; }
   else ctx.fillStyle = '#5b6670';
   ctx.fill();
-  fillRR(ctx, bx + btnH * 0.3, byy + btnH * 0.12, btnW - btnH * 0.6, btnH * 0.26, btnH * 0.13, 'rgba(255,255,255,0.22)');
-  ctx.textAlign = 'center'; ctx.fillStyle = canStart ? '#3a1e00' : 'rgba(200,212,222,0.7)';
-  ctx.font = `900 ${Math.round(H * 0.044)}px sans-serif`;
-  ctx.fillText('START', cx, byy + btnH * 0.66);
+  fillRR(ctx, bx + btnH * 0.3, byy + btnH * 0.12, btnW - btnH * 0.6, btnH * 0.24, btnH * 0.12, 'rgba(255,255,255,0.22)');
+  ctx.textAlign = 'center'; ctx.fillStyle = canStart ? '#3a1e00' : 'rgba(220,228,238,0.8)';
+  ctx.font = `900 ${Math.round(H * 0.038)}px sans-serif`;
+  ctx.fillText(unlocked ? `STAGE ${local + 1}` : 'ZABLOKOWANE', cx - (unlocked ? btnH * 0.35 : 0), byy + btnH * 0.64);
   const start = { x: bx, y: byy, w: btnW, h: btnH };
+  // skrzynka-nagroda za TEN stage, doczepiona do prawej krawędzi przycisku
+  if (unlocked) drawStageChest(ctx, bx + btnW - btnH * 0.2, byy + btnH / 2, btnH * 0.62, prog.chestClaimed ? 'claimed' : 'locked');
   if (!s.hook) {
-    ctx.fillStyle = '#ffcb45'; ctx.font = `${Math.round(H * 0.020)}px sans-serif`;
-    ctx.fillText('Zdobądź hak w plecaku, by zacząć', cx, byy - H * 0.02);
+    ctx.fillStyle = '#ffcb45'; ctx.textAlign = 'center'; ctx.font = `${Math.round(H * 0.019)}px sans-serif`;
+    ctx.fillText('Zdobądź hak w plecaku, by zacząć', cx, byy - H * 0.018);
   }
 
   // === F: tab bar ===
@@ -284,20 +310,20 @@ function renderHome(ctx, s) {
     if (k === 1) backpack = { x: tcx - W * 0.10, y: tabY, w: W * 0.20, h: tabH };
   }
 
-  // skrzynka do odebrania (jeśli jest oczekująca)
+  // skrzynka do ODEBRANIA (pending) — pływa po lewej nad paskiem stage
   let chest = null;
   if (s.progress.pendingChests > 0) {
-    chest = { x: W * 0.05, y: H * 0.60, w: W * 0.17, h: W * 0.17 };
+    chest = { x: W * 0.05, y: H * 0.56, w: W * 0.16, h: W * 0.16 };
     fillRR(ctx, chest.x, chest.y, chest.w, chest.h, 8, '#3a2f12');
     rrPath(ctx, chest.x, chest.y, chest.w, chest.h, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#ffcb45'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(chest.w * 0.2)}px sans-serif`;
+    ctx.fillStyle = '#ffcb45'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(chest.w * 0.19)}px sans-serif`;
     ctx.fillText('SKRZYNIA', chest.x + chest.w / 2, chest.y + chest.h * 0.58);
     ctx.beginPath(); ctx.arc(chest.x + chest.w, chest.y, 12, 0, Math.PI * 2); ctx.fillStyle = '#ff4d4d'; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(String(s.progress.pendingChests), chest.x + chest.w, chest.y + 5);
   }
 
   ctx.textAlign = 'left';
-  s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest };
+  s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest, stageNodes };
 
   // overlay otwarcia skrzynki
   if (s.chestReveal) {
@@ -365,7 +391,7 @@ function cellContentBBox(src, frame, cols, rows, inset) {
 
 // stabilna klatka: rysuje tylko PRZYCIĘTĄ komórkę (bez sąsiadów), stała skala, środek-X i DÓŁ
 // treści przyklejone do (cx, baselineY) — koniec skakania i fragmentów z innych klatek.
-function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, cellH, inset = 0.08) {
+function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, cellH, inset = 0.14) {
   const c = keyedSheet(src); if (!c) return;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
   const fw = IW / cols, fh = IH / rows;
@@ -459,6 +485,24 @@ function drawLock(ctx, cx, cy, r) {
   ctx.strokeStyle = '#fff'; ctx.lineWidth = r * 0.22;
   ctx.beginPath(); ctx.arc(cx, cy - r * 0.25, r * 0.5, Math.PI, 0); ctx.stroke();
   fillRR(ctx, cx - r * 0.6, cy - r * 0.1, r * 1.2, r * 0.95, r * 0.15, '#fff');
+}
+
+// skrzynka-nagroda za stage przy przycisku: 'locked' (jeszcze nie zdobyta) / 'claimed' (odebrana)
+function drawStageChest(ctx, cx, cy, size, state) {
+  const claimed = state === 'claimed';
+  const w = size, h = size * 0.8, x = cx - w / 2, y = cy - h / 2;
+  fillRR(ctx, x, y, w, h, size * 0.14, claimed ? '#caa23a' : '#48566a');
+  rrPath(ctx, x, y, w, h, size * 0.14); ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, y + h * 0.36); ctx.lineTo(x + w, y + h * 0.36); ctx.stroke();
+  if (claimed) {
+    ctx.strokeStyle = '#2e7d4f'; ctx.lineWidth = Math.max(2, size * 0.12); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - size * 0.18, cy + size * 0.02); ctx.lineTo(cx - size * 0.04, cy + size * 0.16); ctx.lineTo(cx + size * 0.2, cy - size * 0.14); ctx.stroke(); ctx.lineCap = 'butt';
+  } else {
+    ctx.fillStyle = '#ffcf5a'; fillRR(ctx, cx - size * 0.1, cy - size * 0.02, size * 0.2, size * 0.18, size * 0.04, '#ffcf5a');
+    ctx.strokeStyle = '#ffcf5a'; ctx.lineWidth = Math.max(1.5, size * 0.05);
+    ctx.beginPath(); ctx.arc(cx, cy - size * 0.02, size * 0.08, Math.PI, 0); ctx.stroke();
+  }
 }
 
 function roundedBtn(ctx, r, color, label) {
@@ -583,9 +627,8 @@ function renderDescent(ctx, s, hookX, hookY) {
   g.addColorStop(0, top); g.addColorStop(1, bot);
   ctx.fillStyle = g; ctx.fillRect(0, 0, WORLD.W, WORLD.H);
 
-  // scena powierzchni (pierwsze łowisko) — widoczna u góry na starcie, receduje
-  // z parallaxem i zanika z głębokością (otoczenie ciemnieje gdy schodzimy niżej)
-  const bg = img(BG_SURFACE);
+  // scena powierzchni (areny bieżącego stage'a) — widoczna u góry, receduje z parallaxem
+  const bg = img(arenaBgSrc(s.stageIndex));
   if (ready(bg)) {
     const bw = WORLD.W;
     const bh = bw * (bg.naturalHeight / bg.naturalWidth);
@@ -711,7 +754,7 @@ function renderEnd(ctx, s) {
   ctx.textAlign = 'center';
   const st = STAGES[s.stageIndex];
   ctx.fillStyle = '#e6f0ff'; ctx.font = `${Math.round(H * 0.03)}px sans-serif`;
-  ctx.fillText(st.id + '. ' + st.name, cx, H * 0.30);
+  ctx.fillText(st.arenaName + ' · Stage ' + st.no, cx, H * 0.30);
   // status: wyczyszczone vs fail
   const cleared = s.lastResult && s.lastResult.cleared;
   ctx.fillStyle = cleared ? '#7fffa1' : '#ff9a9a'; ctx.font = `bold ${Math.round(H * 0.034)}px sans-serif`;

@@ -1,4 +1,4 @@
-import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC } from './config.js';
+import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
 import { createGrid, placeItem } from './logic/backpack.js';
 import { computeScore, computeStars } from './logic/scoring.js';
 import { loadProgress, saveProgress } from './persistence.js';
@@ -77,6 +77,15 @@ function persist(s) {
 // --- nawigacja Home ---
 export function carouselMove(s, dir) {
   s.stageIndex = Math.max(0, Math.min(STAGES.length - 1, s.stageIndex + dir));
+}
+// strzałki u góry: zmiana ARENY (skok o 10), zachowując lokalny stage. Zmienia scenę Home.
+export function arenaMove(s, dir) {
+  const arena = Math.max(0, Math.min(ARENA_COUNT - 1, arenaOf(s.stageIndex) + dir));
+  s.stageIndex = arena * STAGES_PER_ARENA + localOf(s.stageIndex);
+}
+// pasek na dole: wybór konkretnego stage (global index) w obrębie bieżącej areny.
+export function selectStageIndex(s, idx) {
+  s.stageIndex = Math.max(0, Math.min(STAGES.length - 1, idx));
 }
 export function stageUnlocked(s, i = s.stageIndex) {
   return !!(s.progress.stages[i] && s.progress.stages[i].unlocked);

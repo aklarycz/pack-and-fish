@@ -1,5 +1,5 @@
 import { WORLD, BACKPACK, layoutWorld, CAST_DUR } from './config.js';
-import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
+import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
@@ -46,11 +46,12 @@ attachInput(canvas, {
       if (s.chestReveal) { dismissChest(s); return; }  // tap zamyka reveal skrzynki
       const h = s._home;
       if (!h) return;
-      if (h.chest && hit(h.chest, x, y)) openChest(s);
-      else if (hit(h.left, x, y)) carouselMove(s, -1);
-      else if (hit(h.right, x, y)) carouselMove(s, 1);
-      else if (hit(h.backpack, x, y)) openBackpack(s);
-      else if (hit(h.start, x, y) || hit(h.stage, x, y)) {
+      if (h.chest && hit(h.chest, x, y)) { openChest(s); return; }
+      if (hit(h.left, x, y)) { arenaMove(s, -1); return; }   // strzałki = zmiana ARENY
+      if (hit(h.right, x, y)) { arenaMove(s, 1); return; }
+      if (hit(h.backpack, x, y)) { openBackpack(s); return; }
+      if (h.stageNodes) { for (const n of h.stageNodes) if (hit(n.rect, x, y)) { selectStageIndex(s, n.index); return; } }
+      if (hit(h.start, x, y) || hit(h.stage, x, y)) {
         if (!s.cast && s.hook && stageUnlocked(s)) s.cast = { t: 0 }; // zarzut -> potem descent
       }
     } else if (s.mode === 'BACKPACK') {
