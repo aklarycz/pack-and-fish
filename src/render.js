@@ -121,7 +121,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b35'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b36'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -766,9 +766,17 @@ function renderDescent(ctx, s, hookX, hookY) {
   g.addColorStop(0, top); g.addColorStop(1, bot);
   ctx.fillStyle = g; ctx.fillRect(0, 0, WORLD.W, WORLD.H);
 
+  // tło podwodne — zapętlone w pionie, przewija się z głębokością (asset gdy wrzucony)
+  const uw = img(arenaUnderwaterSrc(s.stageIndex));
+  if (ready(uw)) drawScrollTiles(ctx, uw, camY, 0.9 - df * 0.55);
+
   // (scena powierzchni usunięta — descent zaczyna się OD RAZU pod wodą; przejście maskuje kurtyna)
   // dodatkowe ściemnienie otoczenia z głębokością (atmosfera głębin)
   if (df > 0) { ctx.fillStyle = `rgba(2,9,16,${(df * 0.55).toFixed(3)})`; ctx.fillRect(0, 0, WORLD.W, WORLD.H); }
+
+  // "shader wody": snopy światła z powierzchni (god rays) — animowane, zanikają z głębokością
+  const nowD = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  drawGodRays(ctx, nowD, df);
 
   // "słup wody" — drobinki na stałych pozycjach świata, parallax. Przewijają się
   // w górę razem z kamerą, dając stały układ odniesienia: to MY opadamy.
@@ -880,6 +888,38 @@ function drawParticles(ctx, camY, parallax, spacing, size, alpha) {
       ctx.beginPath(); ctx.arc(wx, sy, size, 0, Math.PI * 2); ctx.fill();
     }
   }
+}
+
+// źródło tła podwodnego per arena (zapętlane w pionie)
+function arenaUnderwaterSrc(globalIndex) { return `assets/arenas/${ARENAS[arenaOf(globalIndex)].bg}-underwater.png`; }
+
+// zapętlone tło podwodne — kafle w pionie przewijają się z głębokością (parallax 0.6)
+function drawScrollTiles(ctx, im, camY, brightness) {
+  const W = WORLD.W, H = WORLD.H, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+  const tileH = W * (ih / iw);
+  let y = -(((camY * 0.6) % tileH + tileH) % tileH);
+  ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, brightness));
+  for (; y < H; y += tileH) ctx.drawImage(im, 0, y, W, tileH);
+  ctx.restore();
+}
+
+// "shader wody": snopy światła (god rays) z powierzchni — animowane, zanikają z głębokością
+function drawGodRays(ctx, now, df) {
+  const W = WORLD.W, H = WORLD.H, a = (1 - df) * 0.16;
+  if (a <= 0.01) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 4; k++) {
+    const x = W * (0.18 + 0.21 * k) + Math.sin(now * 0.35 + k * 1.7) * W * 0.05;
+    const w = W * (0.09 + 0.025 * (k % 2)), endY = H * 0.7;
+    const grd = ctx.createLinearGradient(0, 0, 0, endY);
+    grd.addColorStop(0, `rgba(160,215,255,${a})`); grd.addColorStop(1, 'rgba(160,215,255,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2, 0); ctx.lineTo(x + w / 2, 0);
+    ctx.lineTo(x + w * 1.6, endY); ctx.lineTo(x - w * 1.6, endY);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
 }
 
 function renderEnd(ctx, s) {
