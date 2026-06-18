@@ -66,7 +66,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b11'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b12'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -236,14 +236,15 @@ function renderHome(ctx, s) {
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
   ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.13, H * 0.010, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
-  const castSheet = keyedSheet(CAT_CAST_SHEET), idleStill = img(CAT_FRONT_IDLE);
+  const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
   if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
-    drawCatCast(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
-  } else if (!s.cast && ready(idleStill)) {
-    // idle: czysta poza z alfą grafika (zero białych kieszeni / ucięć stołka), delikatny oddech
-    const bob = Math.sin(now * 1.6) * H * 0.004;
-    drawSheetStable(ctx, CAT_FRONT_IDLE, 0, 1, 1, cx, baselineY + bob, catH);
+    drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+  } else if (!s.cast && idleSheet) {
+    // idle: animowany sheet (mruganie/przysypianie); korpus przybity do molo, góra animuje
+    const f = Math.floor(now * 1000 / 280) % CAT_FRAMES;
+    drawCatFrame(ctx, CAT_IDLE_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+    drawDozeZ(ctx, cx + catH * 0.42, baselineY - catH * 0.82, now); // Zzz — przysypianie
   } else {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
@@ -458,9 +459,10 @@ function lowerBBox(src, frame, cols, rows, topFrac) {
   _lb[key] = bb; return bb;
 }
 
-// Cast STABILNY: rozmiar ze stałego union-bbox, ale pozycja kotwiczona po DOLNYM korpusie
-// danej klatki (środek-X i dół) — siedzący kot stoi w miejscu, a wędka/łapy się ruszają.
-function drawCatCast(ctx, src, frame, cols, rows, cx, baselineY, contentH) {
+// Klatka kota STABILNA (idle i cast): rozmiar ze stałego union-bbox, pozycja kotwiczona po
+// DOLNYM korpusie danej klatki (środek-X i dół) — siedzący kot/stołek STOI w miejscu na molo
+// (zero lewitacji), a góra (mina/łapy/wędka) animuje się swobodnie.
+function drawCatFrame(ctx, src, frame, cols, rows, cx, baselineY, contentH) {
   const c = keyedSheet(src); if (!c) return;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height, fw = IW / cols, fh = IH / rows;
   const ub = unionBBox(src, cols, rows, 0); if (!ub) return;
