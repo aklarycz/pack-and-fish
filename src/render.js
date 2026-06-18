@@ -54,8 +54,23 @@ const FISH_SPRITE = {
   twardziel: 'assets/fish/twardziel.png',
 };
 const BUBBLE_SRC = 'assets/bubble.png';
+const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla (alfa), kołyszą się; rozsuwają przy zarzucie
 // tło sceny zależne od areny bieżącego stage'a (arena-01-surface.png, arena-02-…).
 function arenaBgSrc(globalIndex) { return `assets/arenas/${ARENAS[arenaOf(globalIndex)].bg}-surface.png`; }
+
+// Przednie zarośla: kołyszą się (idle), a przy zarzucie/zanurzeniu rozsuwają na boki.
+// part 0..1 = stopień rozsunięcia (0 = kołysanie, 1 = w pełni rozsunięte).
+function drawFoliage(ctx, fol, W, H, now, part) {
+  const iw = fol.naturalWidth || fol.width, ih = fol.naturalHeight || fol.height;
+  const scale = W / iw, dw = W, dh = ih * scale, dy = H - dh; // pełna szerokość, kotwiczone do dołu
+  const off = part * W * 0.55;                                 // rozsuw na boki
+  const sway = Math.sin(now * 1.5) * 0.02 * (1 - part);        // kołysanie zanika gdy się rozsuwa
+  ctx.save();
+  ctx.transform(1, 0, sway, 1, -sway * H, 0);                  // shear (dół kołysze się najmocniej)
+  ctx.drawImage(fol, 0, 0, iw / 2, ih, -off, dy, dw / 2, dh);          // lewa połowa → w lewo
+  ctx.drawImage(fol, iw / 2, 0, iw / 2, ih, W / 2 + off, dy, dw / 2, dh); // prawa połowa → w prawo
+  ctx.restore();
+}
 const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
 const CAT_FRONT_SLEEP = 'assets/cat/cat-front-sleep.png'; // śpiący front (oczy zamknięte, cały stołek, alfa)
 const CAT_FRONT_CAST = 'assets/cat/cat-front-cast.png';
@@ -72,7 +87,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b28'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b30'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -265,6 +280,10 @@ function renderHome(ctx, s) {
       if (!s.cast) drawDozeZ(ctx, cx + catH * 0.34, catCy - catH * 0.42, now);
     }
   }
+
+  // przednie zarośla — kołyszą się; przy zarzucie rozsuwają się na boki (zanurzenie)
+  const fol = keyedSheet(FOLIAGE); // usuwa wypalone tło assetu
+  if (fol) drawFoliage(ctx, fol, W, H, now, s.cast ? Math.min(1, s.cast.t / CAST_DUR) : 0);
 
   // === Pasek wyboru STAGE 1-10 (nad przyciskiem) ===
   const stripY = H * 0.685, m = W * 0.06, usable = W - 2 * m, gap = usable / STAGES_PER_ARENA;
