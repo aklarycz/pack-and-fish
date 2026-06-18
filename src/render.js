@@ -52,6 +52,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
+const BUILD = 'b5'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -321,6 +322,10 @@ function renderHome(ctx, s) {
     ctx.beginPath(); ctx.arc(chest.x + chest.w, chest.y, 12, 0, Math.PI * 2); ctx.fillStyle = '#ff4d4d'; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(String(s.progress.pendingChests), chest.x + chest.w, chest.y + 5);
   }
+
+  // znacznik buildu (mały, w rogu) — diagnostyka świeżości kodu
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = `bold ${Math.round(H * 0.016)}px monospace`; ctx.textAlign = 'left';
+  ctx.fillText(BUILD, W * 0.02, H * 0.86);
 
   ctx.textAlign = 'left';
   s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest, stageNodes };
