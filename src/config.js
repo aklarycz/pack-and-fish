@@ -73,12 +73,12 @@ export const FISH_TYPES = {
   // coins (waluta do merge) oddzielone od scoreValue (do score).
   // okna szersze (łapanie z zapasem, nie "na styk"); radius +30% (większe ryby).
   // bass (mała): szybka, UCIEKA od haka; łatwa do złapania (niski hp)
-  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 21, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
+  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 27, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
   // sum (średnia): wolniejszy, UCIEKA; hp tak dobrane, by bazowy hak (atk8) ledwie zdążył (na styk):
   // 8·3.4=27.2 dmg; przy głębi stage'a hp rośnie ~×1.36 → 20·1.36≈27 = na styk
-  sredniak:  { id: 'sredniak',  hp: 20, window: 3.4, speed: 72,  aggroRange: 150, radius: 29, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
+  sredniak:  { id: 'sredniak',  hp: 20, window: 3.4, speed: 72,  aggroRange: 150, radius: 46, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
   // muskie (duża): ATAKUJE hak, NIE DO ZŁAPANIA bazowym sprzętem (8·2.4=19.2 ≪ 40; z kotwicą 9·2.4=21.6 ≪ 40)
-  twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 39, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
+  twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 72, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };
 
 // Rampa wg głębokości (metry). Wartości interpolowane/progowane w ramp.js.
@@ -119,21 +119,22 @@ export const STAGES_PER_ARENA = 10;
 // 3★ ≈ 93% (złap prawie wszystko) — spójne i zawsze osiągalne, bez ręcznego strojenia.
 const STAR_FRAC = { t1: 0.58, t2: 0.79, t3: 0.93 };
 
-// Generuje 10 stage'y areny ze skalowanej bazy. TYLKO plotka+sredniak — twardziel jest
-// nieubijalny obecnym sprzętem (hp34 > atk·okno nawet z kotwicą), więc każdy stage da się
-// wyczyścić. Twardziel wróci, gdy dojdą mocniejsze haki/akcesoria.
-// UWAGA: balans stage'y 2-10 jest heurystyczny (skalowanie) — stage 1 trzyma sprawdzone liczby.
+// Generuje 10 stage'y areny ze skalowanej bazy. bass+sum to ŁOWNY loot (liczą się do score),
+// muskie (twardziel) to HAZARD — nie do złapania, spawnuje się na KOŃCU worka (głęboko),
+// NIE wlicza się do maxScore (inaczej 3★ byłoby nieosiągalne). Gracz musi go unikać.
+// UWAGA: balans stage'y 2-10 jest heurystyczny — stage 1 trzyma sprawdzone liczby.
 function buildArenaStages(base, arena) {
   const stages = [];
   for (let i = 0; i < STAGES_PER_ARENA; i++) {
     const mult = 1 + i * 0.10;
     const plotka = Math.round(base.plotka * mult);
     const sredniak = Math.round(base.sredniak * mult);
-    const bag = { plotka, sredniak, twardziel: 0 };
+    const muskie = base.muskie + Math.floor(i * 0.3); // hazard: rośnie z głębokością stage'a
+    const bag = { plotka, sredniak, twardziel: muskie };
     const difficultyOffsetM = base.offsetM + i * 2;
     const depthCap = base.depthCap + i * 2;
     const start = Math.max(base.spawnMin, base.spawnStart - i * 0.05);
-    const maxScore = depthCap +
+    const maxScore = depthCap + // tylko loot (bass+sum); muskie wykluczony
       (plotka * FISH_TYPES.plotka.scoreValue + sredniak * FISH_TYPES.sredniak.scoreValue) * SCORE.wStun;
     stages.push({
       arenaId: arena.id, arenaName: arena.name, bg: arena.bg, no: i + 1,
@@ -152,11 +153,11 @@ function buildArenaStages(base, arena) {
 // pozostałe pokazują tintowany fallback do czasu dodania grafik.
 export const ARENAS = [
   { id: 1, name: 'Przybrzeże', bg: 'arena-01', tint: ['#16406e', '#0b2138'],
-    base: { plotka: 10, sredniak: 6,  offsetM: 0,  depthCap: 30, spawnStart: 2.3, spawnMin: 2.3, perM: 0 } },
+    base: { plotka: 10, sredniak: 6,  muskie: 1, offsetM: 0,  depthCap: 30, spawnStart: 2.3, spawnMin: 2.3, perM: 0 } },
   { id: 2, name: 'Toń',        bg: 'arena-02', tint: ['#114b5f', '#06222b'],
-    base: { plotka: 12, sredniak: 10, offsetM: 12, depthCap: 40, spawnStart: 1.9, spawnMin: 1.4, perM: 0.008 } },
+    base: { plotka: 12, sredniak: 10, muskie: 2, offsetM: 12, depthCap: 40, spawnStart: 1.9, spawnMin: 1.4, perM: 0.008 } },
   { id: 3, name: 'Głębia',     bg: 'arena-03', tint: ['#2a2a5e', '#0a0a22'],
-    base: { plotka: 10, sredniak: 16, offsetM: 25, depthCap: 50, spawnStart: 1.6, spawnMin: 1.1, perM: 0.01 } },
+    base: { plotka: 10, sredniak: 16, muskie: 3, offsetM: 25, depthCap: 50, spawnStart: 1.6, spawnMin: 1.1, perM: 0.01 } },
 ];
 export const ARENA_COUNT = ARENAS.length;
 

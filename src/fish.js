@@ -1,7 +1,8 @@
 import { FISH_TYPES, WORLD } from './config.js';
 
-// Ryba może wypłynąć trochę poza krawędź ekranu, dopiero potem zawraca.
-const EDGE_MARGIN = 60;
+// Ryba może wypłynąć tylko TROCHĘ poza pasmo haka — i tak musi zostać w zasięgu połowu
+// (clamp na końcu updateFish), żeby uciekająca ryba nie zniknęła z ekranu poza zasięgiem.
+const EDGE_MARGIN = 30;
 
 export function inAggroRange(fish, hookX, hookWorldY, types = FISH_TYPES) {
   const t = types[fish.type];
@@ -57,4 +58,6 @@ export function updateFish(fish, hookX, hookWorldY, dt, speedMul, rng = Math.ran
     }
     fish.y = fish.baseY + Math.sin(fish.t * 2.0 + (fish.phaseY || 0)) * (fish.bobAmp || 6) * 0.4;
   }
+  // ZAWSZE w zasięgu połowu — uciekająca ryba zatrzymuje się przy krawędzi (zapędzona), nie znika
+  fish.x = Math.max(WORLD.hookMinX - EDGE_MARGIN, Math.min(WORLD.hookMaxX + EDGE_MARGIN, fish.x));
 }
