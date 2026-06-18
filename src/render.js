@@ -60,13 +60,14 @@ const CAT_FRONT_CAST = 'assets/cat/cat-front-cast.png';
 const CAT_IDLE_SHEET = 'assets/cat/cat-front-idle-sheet-3x3.png';
 const CAT_CAST_SHEET = 'assets/cat/cat-front-cast-sheet-3x3.png';
 const CAT_COLS = 3, CAT_ROWS = 3, CAT_FRAMES = 9;
+const CAT_SLEEP_FRAME = 4; // klatka z zamkniętymi oczami (kot śpi na Home)
 const STAGE_SPRITE = ['assets/stages/stage1.png', 'assets/stages/stage2.png', 'assets/stages/stage3.png'];
 const STAGE_LOCKED = [null, 'assets/stages/stage2_locked.png', 'assets/stages/stage3_locked.png'];
 const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b17'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b18'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -241,9 +242,12 @@ function renderHome(ctx, s) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
     drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
   } else if (!s.cast && idleSheet) {
-    // idle: animowany sheet (prawdziwe klatki mrugania/przysypiania); korpus przybity do molo
-    const f = Math.floor(now * 1000 / 280) % CAT_FRAMES;
-    drawCatFrame(ctx, CAT_IDLE_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+    // śpi: statyczna klatka z zamkniętymi oczami + delikatny oddech (kotwiczony do molo);
+    // budzi się i zarzuca po STARCIE. Ciągłe Zzz pasuje do snu.
+    const breath = 1 + Math.sin(now * 1.3) * 0.01;
+    ctx.save(); ctx.translate(cx, baselineY); ctx.scale(1, breath); ctx.translate(-cx, -baselineY);
+    drawCatFrame(ctx, CAT_IDLE_SHEET, CAT_SLEEP_FRAME, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+    ctx.restore();
     drawDozeZ(ctx, cx - catH * 0.22, baselineY - catH * 1.02, now); // Zzz nad główką
   } else {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
