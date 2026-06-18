@@ -2,7 +2,7 @@ import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, CAS
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
-const ASSET_VER = 'b24'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
+const ASSET_VER = 'b35'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
 const _imgCache = {};
 function img(src) {
   let im = _imgCache[src];
@@ -121,7 +121,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b34'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b35'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
