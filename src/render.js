@@ -70,7 +70,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b24'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b25'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -234,8 +234,8 @@ function renderHome(ctx, s) {
   ctx.fillText(A.name, cx, H * 0.148);
   ctx.restore();
 
-  // bohater Tofu — FRONT, śpi (osobna poza: oczy zamknięte, CAŁY stołek, alfa); stołek na molo
-  const baselineY = H * 0.55, catH = H * 0.30, catCy = baselineY - catH * 0.5;
+  // bohater Tofu — FRONT, śpi (osobna poza: oczy zamknięte, CAŁY stołek, alfa); mieści się na molo
+  const baselineY = H * 0.55, catH = H * 0.265, catCy = baselineY - catH * 0.5;
   catRect = { x: cx - W * 0.22, y: baselineY - catH * 0.9, w: W * 0.44, h: catH * 0.9 };
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.15, H * 0.012, 0, 0, Math.PI * 2); ctx.fill();
