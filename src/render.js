@@ -216,7 +216,7 @@ function renderHome(ctx, s) {
   ctx.restore();
 
   // bohater Tofu — FRONT, siedzi na molo (stopy ~0.55H, stałe kotwiczenie klatek)
-  const baselineY = H * 0.55, cellH = H * 0.34, catCy = baselineY - cellH * 0.45, catH = cellH;
+  const baselineY = H * 0.55, cellH = H * 0.30, catCy = baselineY - cellH * 0.45, catH = cellH;
   catRect = { x: cx - W * 0.20, y: baselineY - cellH * 0.9, w: W * 0.40, h: cellH * 0.9 };
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.12, H * 0.010, 0, 0, Math.PI * 2); ctx.fill();
