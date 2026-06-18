@@ -2,7 +2,7 @@ import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, CAS
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
-const ASSET_VER = 'b35'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
+const ASSET_VER = 'b37'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
 const _imgCache = {};
 function img(src) {
   let im = _imgCache[src];
@@ -121,7 +121,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b36'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b37'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -893,13 +893,19 @@ function drawParticles(ctx, camY, parallax, spacing, size, alpha) {
 // źródło tła podwodnego per arena (zapętlane w pionie)
 function arenaUnderwaterSrc(globalIndex) { return `assets/arenas/${ARENAS[arenaOf(globalIndex)].bg}-underwater.png`; }
 
-// zapętlone tło podwodne — kafle w pionie przewijają się z głębokością (parallax 0.6)
+// zapętlone tło podwodne — kafle w pionie, LUSTRZANE (co druga odbita) by krawędzie się zgrały
+// (asset nie jest tileable: góra jasna, dół ciemny → mirror łączy dół-z-dołem, górę-z-górą).
 function drawScrollTiles(ctx, im, camY, brightness) {
   const W = WORLD.W, H = WORLD.H, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
-  const tileH = W * (ih / iw);
-  let y = -(((camY * 0.6) % tileH + tileH) % tileH);
+  const tileH = W * (ih / iw), scroll = camY * 0.6, first = Math.floor(scroll / tileH);
   ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, brightness));
-  for (; y < H; y += tileH) ctx.drawImage(im, 0, y, W, tileH);
+  for (let wi = first; ; wi++) {
+    const y = wi * tileH - scroll;
+    if (y >= H) break;
+    if ((((wi % 2) + 2) % 2) === 1) { // nieparzysta → odbita w pionie
+      ctx.save(); ctx.translate(0, y + tileH); ctx.scale(1, -1); ctx.drawImage(im, 0, 0, W, tileH); ctx.restore();
+    } else ctx.drawImage(im, 0, y, W, tileH);
+  }
   ctx.restore();
 }
 
