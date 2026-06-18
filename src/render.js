@@ -2,7 +2,7 @@ import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, ARE
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
-const ASSET_VER = 'b7'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
+const ASSET_VER = 'b24'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
 const _imgCache = {};
 function img(src) {
   let im = _imgCache[src];
@@ -25,6 +25,8 @@ function keyedSheet(src) {
   const cc = c.getContext('2d'); cc.drawImage(im, 0, 0);
   let id; try { id = cc.getImageData(0, 0, w, h); } catch (e) { _keyed[src] = im; return im; }
   const d = id.data, N = w * h;
+  // już ma prawdziwą alfę (przezroczysty róg) → tło/kieszenie wycięte przez grafika; nie ruszamy
+  if (d[3] < 20) { _keyed[src] = c; return c; }
   const cand = new Uint8Array(N);
   for (let p = 0; p < N; p++) {
     if (d[p * 4 + 3] < 20) continue;
@@ -55,6 +57,7 @@ const BUBBLE_SRC = 'assets/bubble.png';
 // tło sceny zależne od areny bieżącego stage'a (arena-01-surface.png, arena-02-…).
 function arenaBgSrc(globalIndex) { return `assets/arenas/${ARENAS[arenaOf(globalIndex)].bg}-surface.png`; }
 const CAT_FRONT_IDLE = 'assets/cat/cat-front-idle.png';
+const CAT_FRONT_SLEEP = 'assets/cat/cat-front-sleep.png'; // śpiący front (oczy zamknięte, cały stołek, alfa)
 const CAT_FRONT_CAST = 'assets/cat/cat-front-cast.png';
 // sheety klatkowe w siatce 3x3 (9 klatek; priorytet nad pozą+tween jeśli istnieją).
 const CAT_IDLE_SHEET = 'assets/cat/cat-front-idle-sheet-3x3.png';
@@ -67,7 +70,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b23'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b24'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -231,23 +234,23 @@ function renderHome(ctx, s) {
   ctx.fillText(A.name, cx, H * 0.148);
   ctx.restore();
 
-  // bohater Tofu — FRONT, śpi (klatka z zamkniętymi oczami z sheetu); mniejszy
-  const baselineY = H * 0.555, catH = H * 0.245, catCy = baselineY - catH * 0.5;
-  catRect = { x: cx - W * 0.20, y: baselineY - catH * 0.9, w: W * 0.40, h: catH * 0.9 };
-  ctx.fillStyle = 'rgba(0,0,0,0.22)';
-  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.155, H * 0.012, 0, 0, Math.PI * 2); ctx.fill();
+  // bohater Tofu — FRONT, śpi (osobna poza: oczy zamknięte, CAŁY stołek, alfa); stołek na molo
+  const baselineY = H * 0.55, catH = H * 0.30, catCy = baselineY - catH * 0.5;
+  catRect = { x: cx - W * 0.22, y: baselineY - catH * 0.9, w: W * 0.44, h: catH * 0.9 };
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.15, H * 0.012, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   const castSheet = keyedSheet(CAT_CAST_SHEET);
   if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
     drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
-  } else if (!s.cast && keyedSheet(CAT_IDLE_SHEET)) {
-    // śpi: statyczna klatka z zamkniętymi oczami (frame 4) + oddech + Zzz; budzi się po STARCIE
+  } else if (!s.cast && keyedSheet(CAT_FRONT_SLEEP)) {
+    // śpi: osobna poza (cały stołek, zamknięte oczy) + oddech + Zzz; budzi się i zarzuca po STARCIE
     const breath = 1 + Math.sin(now * 1.3) * 0.01;
     ctx.save(); ctx.translate(cx, baselineY); ctx.scale(1, breath); ctx.translate(-cx, -baselineY);
-    drawCatFrame(ctx, CAT_IDLE_SHEET, CAT_SLEEP_FRAME, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+    drawCatFrame(ctx, CAT_FRONT_SLEEP, 0, 1, 1, cx, baselineY, catH);
     ctx.restore();
-    drawDozeZ(ctx, cx - catH * 0.22, baselineY - catH * 1.02, now);
+    drawDozeZ(ctx, cx - catH * 0.24, baselineY - catH * 1.02, now);
   } else {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
