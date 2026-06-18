@@ -32,7 +32,7 @@ function keyedSheet(src) {
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
     if (lum > 225 && (Math.max(r, g, b) - Math.min(r, g, b)) < 14) cand[p] = 1; // neutralna biel
   }
-  const seen = new Uint8Array(N), big = N * 0.0006; // próg pola: tło/kieszenie » refleksy
+  const seen = new Uint8Array(N), big = N * 0.00008; // próg pola: tło/kieszenie (też małe w komórkach sheetu) » drobne refleksy
   for (let s0 = 0; s0 < N; s0++) {
     if (!cand[s0] || seen[s0]) continue;
     const stack = [s0], px = [s0]; seen[s0] = 1;
@@ -66,7 +66,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b12'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b13'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -244,7 +244,7 @@ function renderHome(ctx, s) {
     // idle: animowany sheet (mruganie/przysypianie); korpus przybity do molo, góra animuje
     const f = Math.floor(now * 1000 / 280) % CAT_FRAMES;
     drawCatFrame(ctx, CAT_IDLE_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
-    drawDozeZ(ctx, cx + catH * 0.42, baselineY - catH * 0.82, now); // Zzz — przysypianie
+    drawDozeZ(ctx, cx - catH * 0.20, baselineY - catH * 1.0, now); // Zzz nad główką
   } else {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
@@ -342,7 +342,7 @@ function renderHome(ctx, s) {
   // znacznik buildu + diagnostyka wczytanego sheetu (wymiary + wysokość bbox treści)
   let dbg = BUILD;
   const _dc = keyedSheet(CAT_IDLE_SHEET);
-  if (_dc) { const ub = unionBBox(CAT_IDLE_SHEET, CAT_COLS, CAT_ROWS, 0.04); if (ub) dbg += ` ${ub.IW}x${ub.IH} ub${Math.round(ub.h)}/${Math.round(ub.cellH)}`; }
+  if (_dc) { const ub = unionBBox(CAT_IDLE_SHEET, CAT_COLS, CAT_ROWS, CAT_CROP_TOP, CAT_CROP_SIDE); if (ub) dbg += ` ${ub.IW}x${ub.IH} ub${Math.round(ub.h)}/${Math.round(ub.cellH)}`; }
   ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = `bold ${Math.round(H * 0.015)}px monospace`; ctx.textAlign = 'left';
   ctx.fillText(dbg, W * 0.02, H * 0.86);
 
@@ -395,83 +395,71 @@ function _pixCtx(c) {
   const tc = t.getContext('2d'); tc.drawImage(c, 0, 0); return tc;
 }
 
-// UNIA bbox-ów treści wszystkich klatek (współrzędne LOKALNE komórki), liczona raz i cache'owana.
-// Normalizuje padding/kadr sheetu: niezależnie ile marginesu ma eksport, treść jest tej samej
-// wielkości po przeskalowaniu. Stała dla wszystkich klatek → zero jittera.
-// Unia bbox treści w PRZYCIĘTYM (inset) obszarze każdej komórki, współrzędne lokalne obszaru
-// inset. Inset tnie przeciek z sąsiednich klatek. Cache per (src,inset).
+// Przycięcie komórki kota: GÓRA i BOKI tną przeciek z sąsiednich klatek (fragmenty stołka/wędki),
+// DÓŁ nietknięty (stołek w całości). Region = [cropSide..1-cropSide] × [cropTop..1] komórki.
+const CAT_CROP_TOP = 0.08, CAT_CROP_SIDE = 0.03;
+
+// UNIA bbox treści wszystkich klatek w PRZYCIĘTYM regionie (współrzędne lokalne regionu),
+// liczona raz i cache'owana. Normalizuje kadr sheetu (stały rozmiar) i jest stała dla wszystkich
+// klatek → zero jittera/„rośnięcia".
 const _ub = {};
-function unionBBox(src, cols, rows, inset) {
-  const key = src + '|' + inset;
+function unionBBox(src, cols, rows, cropTop, cropSide) {
+  const key = src + '|' + cropTop + '|' + cropSide;
   if (_ub[key]) return _ub[key];
   const c = keyedSheet(src); if (!c) return null;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
   const fw = IW / cols, fh = IH / rows;
   let d; try { d = _pixCtx(c).getImageData(0, 0, IW, IH).data; } catch (e) { return null; }
-  const padX = fw * inset, padY = fh * inset, cw = fw - 2 * padX, ch = fh - 2 * padY;
-  let minx = cw, miny = ch, maxx = 0, maxy = 0, found = false;
+  const rx = fw * cropSide, ry = fh * cropTop, rw = fw * (1 - 2 * cropSide), rh = fh * (1 - cropTop);
+  let minx = rw, miny = rh, maxx = 0, maxy = 0, found = false;
   for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-    const ox = Math.floor(col * fw + padX), oy = Math.floor(row * fh + padY);
-    for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
+    const ox = Math.floor(col * fw + rx), oy = Math.floor(row * fh + ry);
+    for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) {
       if (d[((oy + y) * IW + (ox + x)) * 4 + 3] > 30) {
         found = true; if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
       }
     }
   }
-  const bb = found ? { x: minx, y: miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: 0, y: 0, w: cw, h: ch };
-  bb.IW = IW; bb.IH = IH; bb.cellH = fh; // metadane do diagnostyki
+  const bb = found ? { x: minx, y: miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: 0, y: 0, w: rw, h: rh };
+  bb.IW = IW; bb.IH = IH; bb.cellH = fh;
   _ub[key] = bb; return bb;
 }
 
-// Rysuje klatkę kota STABILNIE i w STAŁYM rozmiarze: treść (unia bbox) skalowana do contentH,
-// środek-X treści w cx, DÓŁ treści (stołek) na baselineY — kot CAŁY (nic nie ucięte) i tego
-// samego rozmiaru niezależnie od kadrowania sheetu. Inset tnie przeciek z sąsiednich klatek.
-function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, contentH, inset = 0) {
-  const c = keyedSheet(src); if (!c) return;
-  const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
-  const fw = IW / cols, fh = IH / rows;
-  const ub = unionBBox(src, cols, rows, inset); if (!ub) return;
-  const col = frame % cols, row = Math.floor(frame / cols) % rows;
-  const x0 = col * fw + fw * inset, y0 = row * fh + fh * inset;
-  const cw = fw * (1 - 2 * inset), ch = fh * (1 - 2 * inset);
-  const sc = contentH / ub.h, dw = cw * sc, dh = ch * sc;
-  const destX = cx - (ub.x + ub.w / 2) * sc;
-  const destY = baselineY - (ub.y + ub.h) * sc;
-  ctx.drawImage(c, x0, y0, cw, ch, destX, destY, dw, dh);
-}
-
-// bbox DOLNEJ części klatki (siedzący korpus + stołek — stabilny między klatkami castu),
-// współrzędne lokalne komórki. Cache per (src,frame,topFrac).
+// bbox DOLNEJ części klatki w przyciętym regionie (siedzący korpus + stołek — stabilny między
+// klatkami), współrzędne lokalne regionu. Punkt kotwiczenia: środek-X i dół tego bboxa.
 const _lb = {};
-function lowerBBox(src, frame, cols, rows, topFrac) {
-  const key = src + '|' + frame + '|' + topFrac;
+function lowerBBox(src, frame, cols, rows, cropTop, cropSide, lowFrac) {
+  const key = src + '|' + frame + '|' + cropTop + '|' + cropSide + '|' + lowFrac;
   if (_lb[key]) return _lb[key];
   const c = keyedSheet(src); if (!c) return null;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height, fw = IW / cols, fh = IH / rows;
   const col = frame % cols, row = Math.floor(frame / cols) % rows;
   let d; try { d = _pixCtx(c).getImageData(0, 0, IW, IH).data; } catch (e) { return null; }
-  const ox = Math.floor(col * fw), oy = Math.floor(row * fh), yStart = Math.floor(topFrac * fh);
-  let minx = fw, miny = fh, maxx = 0, maxy = 0, found = false;
-  for (let y = yStart; y < fh; y++) for (let x = 0; x < fw; x++) {
+  const rx = fw * cropSide, ry = fh * cropTop, rw = fw * (1 - 2 * cropSide), rh = fh * (1 - cropTop);
+  const ox = Math.floor(col * fw + rx), oy = Math.floor(row * fh + ry), yStart = Math.floor(lowFrac * rh);
+  let minx = rw, miny = rh, maxx = 0, maxy = 0, found = false;
+  for (let y = yStart; y < rh; y++) for (let x = 0; x < rw; x++) {
     if (d[((oy + y) * IW + (ox + x)) * 4 + 3] > 30) { found = true; if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y; }
   }
-  const bb = found ? { x: minx, y: miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: 0, y: yStart, w: fw, h: fh - yStart };
+  const bb = found ? { x: minx, y: miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: 0, y: yStart, w: rw, h: rh - yStart };
   _lb[key] = bb; return bb;
 }
 
-// Klatka kota STABILNA (idle i cast): rozmiar ze stałego union-bbox, pozycja kotwiczona po
-// DOLNYM korpusie danej klatki (środek-X i dół) — siedzący kot/stołek STOI w miejscu na molo
-// (zero lewitacji), a góra (mina/łapy/wędka) animuje się swobodnie.
+// Klatka kota STABILNA (idle i cast): rysuje PRZYCIĘTY region komórki (góra+boki bez przecieku),
+// rozmiar ze stałego union-bbox, pozycja kotwiczona po DOLNYM korpusie danej klatki (środek-X i
+// dół) — kot/stołek STOI w miejscu na molo (zero lewitacji), góra (mina/łapy/wędka) animuje się.
 function drawCatFrame(ctx, src, frame, cols, rows, cx, baselineY, contentH) {
   const c = keyedSheet(src); if (!c) return;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height, fw = IW / cols, fh = IH / rows;
-  const ub = unionBBox(src, cols, rows, 0); if (!ub) return;
-  const lb = lowerBBox(src, frame, cols, rows, 0.42); if (!lb) return;
+  const ub = unionBBox(src, cols, rows, CAT_CROP_TOP, CAT_CROP_SIDE); if (!ub) return;
+  const lb = lowerBBox(src, frame, cols, rows, CAT_CROP_TOP, CAT_CROP_SIDE, 0.45); if (!lb) return;
   const col = frame % cols, row = Math.floor(frame / cols) % rows;
+  const x0 = col * fw + fw * CAT_CROP_SIDE, y0 = row * fh + fh * CAT_CROP_TOP;
+  const cw = fw * (1 - 2 * CAT_CROP_SIDE), ch = fh * (1 - CAT_CROP_TOP);
   const sc = contentH / ub.h;
   const destX = cx - (lb.x + lb.w / 2) * sc;
   const destY = baselineY - (lb.y + lb.h) * sc;
-  ctx.drawImage(c, col * fw, row * fh, fw, fh, destX, destY, fw * sc, fh * sc);
+  ctx.drawImage(c, x0, y0, cw, ch, destX, destY, cw * sc, ch * sc);
 }
 
 // pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
