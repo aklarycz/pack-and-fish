@@ -140,8 +140,9 @@ const STAGE_LOCKED = [null, 'assets/stages/stage2_locked.png', 'assets/stages/st
 const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
+let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b43'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b44'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -850,11 +851,21 @@ function renderDescent(ctx, s, hookX, hookY) {
   ctx.beginPath(); ctx.moveTo(0, WORLD.hookMaxY); ctx.lineTo(WORLD.W, WORLD.hookMaxY); ctx.stroke();
   ctx.setLineDash([]);
 
-  // hak — swobodna pozycja (hookX, hookY) w paśmie; żyłka od góry do haka
-  ctx.strokeStyle = '#dfe9f5'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(hookX, 0); ctx.lineTo(hookX, hookY); ctx.stroke();
+  // żyłka — NIE prosta kreska: wygina się i reaguje na ruch. _lineLagX podąża z opóźnieniem
+  // za hakiem → różnica (drag) wygina żyłkę w stronę przeciwną do ruchu; do tego delikatna fala.
+  _lineLagX = _lineLagX === null ? hookX : _lineLagX + (hookX - _lineLagX) * 0.12;
+  const drag = hookX - _lineLagX;                 // proxy prędkości bocznej
+  const sway = Math.sin(nowD * 1.6) * 6;          // delikatne falowanie w wodzie
+  ctx.strokeStyle = '#e8eef6'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(hookX - drag * 0.5, 0);              // góra (rod) lekko prowadzi
+  ctx.bezierCurveTo(
+    hookX - drag * 1.4 + sway, hookY * 0.34,      // cp1 — odstaje za ruchem
+    hookX - drag * 1.9 + sway * 0.6, hookY * 0.72, // cp2
+    hookX, hookY);                                 // koniec przy haku
+  ctx.stroke(); ctx.lineCap = 'butt';
   ctx.fillStyle = '#dfe9f5'; ctx.beginPath(); ctx.arc(hookX, hookY, 8, 0, Math.PI * 2); ctx.fill();
-  // hook na przyszłe efekty (lasery/aury) — placeholder, nic nie rysuje w p1
+  // (docelowo: asset haka + nakładane ikony akcesoriów; placeholder = kółko)
 
   // top bar (HUD) na wierzchu — hak/ryby pod niego nie wchodzą
   ctx.fillStyle = 'rgba(4,18,31,0.9)'; ctx.fillRect(0, 0, WORLD.W, WORLD.topBarH);
