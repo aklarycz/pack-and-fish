@@ -219,19 +219,19 @@ function renderHome(ctx, s) {
   chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');          // gemy (placeholder)
   chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');    // energia (brak gate'u)
 
-  // bohater Tofu — FRONT, na placyku; idle = bujanie+tilt+oddech+"Z", cast = pop (anim z kodu)
-  const catCy = H * 0.66, catH = H * 0.26;
-  catRect = { x: cx - W * 0.28, y: catCy - catH / 2, w: W * 0.56, h: catH };
+  // bohater Tofu — FRONT; stopy na linii (baseline), żeby pod nim było widać jezioro
+  const baselineY = H * 0.62, cellH = H * 0.40, catCy = baselineY - cellH * 0.45, catH = cellH;
+  catRect = { x: cx - W * 0.26, y: baselineY - cellH * 0.9, w: W * 0.52, h: cellH * 0.9 };
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.beginPath(); ctx.ellipse(cx, catCy + catH * 0.46, W * 0.18, H * 0.014, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.16, H * 0.012, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
-  if (s.cast && castSheet) {                       // klatki: cast (siatka 3x3)
+  if (s.cast && castSheet) {                       // klatki: cast (stabilizowane)
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
-    drawSheet(ctx, castSheet, f, CAT_COLS, CAT_ROWS, cx, catCy, catH, 0.04);
-  } else if (!s.cast && idleSheet) {               // klatki: idle (pętla, siatka 3x3)
-    const f = Math.floor(now * 1000 / 130) % CAT_FRAMES;
-    drawSheet(ctx, idleSheet, f, CAT_COLS, CAT_ROWS, cx, catCy, catH, 0.04);
+    drawSheetStable(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, cellH);
+  } else if (!s.cast && idleSheet) {               // klatki: idle (pętla, stabilizowane)
+    const f = Math.floor(now * 1000 / 140) % CAT_FRAMES;
+    drawSheetStable(ctx, CAT_IDLE_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, cellH);
   } else {                                         // fallback: pojedyncza poza + tween z kodu
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
@@ -341,6 +341,42 @@ function drawSheet(ctx, im, frame, cols, rows, cx, cy, targetH, inset = 0) {
   const sx = col * fw + padX, sy = row * fh + padY, sw = fw - 2 * padX, sh = fh - 2 * padY;
   const w = sw * (targetH / sh);
   ctx.drawImage(im, sx, sy, sw, sh, cx - w / 2, cy - targetH / 2, w, targetH);
+}
+
+// bounding-box nieprzezroczystej treści w komórce siatki (do stabilizacji animacji). Cache.
+const _bbox = {};
+function cellContentBBox(src, frame, cols, rows) {
+  const key = src + '|' + cols + 'x' + rows + '|' + frame;
+  if (_bbox[key]) return _bbox[key];
+  const c = keyedSheet(src); if (!c) return null;
+  const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
+  const fw = Math.floor(IW / cols), fh = Math.floor(IH / rows);
+  const col = frame % cols, row = Math.floor(frame / cols) % rows;
+  const ox = col * fw, oy = row * fh;
+  let ctxR;
+  if (c.getContext) ctxR = c.getContext('2d');
+  else { const t = document.createElement('canvas'); t.width = IW; t.height = IH; ctxR = t.getContext('2d'); ctxR.drawImage(c, 0, 0); }
+  let d; try { d = ctxR.getImageData(ox, oy, fw, fh).data; } catch (e) { const bb = { x: ox, y: oy, w: fw, h: fh }; _bbox[key] = bb; return bb; }
+  let minx = fw, miny = fh, maxx = 0, maxy = 0, found = false;
+  for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) {
+    if (d[(y * fw + x) * 4 + 3] > 25) { found = true; if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y; }
+  }
+  const bb = found ? { x: ox + minx, y: oy + miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: ox, y: oy, w: fw, h: fh };
+  _bbox[key] = bb; return bb;
+}
+
+// stabilna klatka: skala stała (cellH), środek-X i DÓŁ treści przyklejone do (cx, baselineY)
+// — kasuje skakanie na boki/góra-dół przy niespójnych klatkach GPT (wędka może iść w górę).
+function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, cellH) {
+  const c = keyedSheet(src); if (!c) return;
+  const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
+  const fw = IW / cols, fh = IH / rows;
+  const col = frame % cols, row = Math.floor(frame / cols) % rows;
+  const bb = cellContentBBox(src, frame, cols, rows); if (!bb) return;
+  const sc = cellH / fh;
+  const ccx = (bb.x - col * fw) + bb.w / 2;   // środek-X treści w komórce
+  const cby = (bb.y - row * fh) + bb.h;        // dół treści w komórce (stopy/krzesło)
+  ctx.drawImage(c, col * fw, row * fh, fw, fh, cx - ccx * sc, baselineY - cby * sc, fw * sc, fh * sc);
 }
 
 // pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
