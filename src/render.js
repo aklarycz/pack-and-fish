@@ -67,7 +67,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b21'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b23'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -231,23 +231,23 @@ function renderHome(ctx, s) {
   ctx.fillText(A.name, cx, H * 0.148);
   ctx.restore();
 
-  // bohater Tofu — FRONT, pojedyncza poza (CAŁY stołek), stołek na deskach molo (~0.55H)
-  const baselineY = H * 0.55, catH = H * 0.34, catCy = baselineY - catH * 0.5;
-  catRect = { x: cx - W * 0.22, y: baselineY - catH * 0.9, w: W * 0.44, h: catH * 0.9 };
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.15, H * 0.012, 0, 0, Math.PI * 2); ctx.fill();
+  // bohater Tofu — FRONT, śpi (klatka z zamkniętymi oczami z sheetu); mniejszy
+  const baselineY = H * 0.555, catH = H * 0.245, catCy = baselineY - catH * 0.5;
+  catRect = { x: cx - W * 0.20, y: baselineY - catH * 0.9, w: W * 0.40, h: catH * 0.9 };
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.155, H * 0.012, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   const castSheet = keyedSheet(CAT_CAST_SHEET);
   if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
     drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
-  } else if (!s.cast && ready(img(CAT_FRONT_IDLE))) {
-    // idle: pojedyncza poza (CAŁY stołek, oryginalne oczy grafika) + delikatny oddech;
-    // budzi się i zarzuca po STARCIE.
-    const breath = 1 + Math.sin(now * 1.5) * 0.01;
+  } else if (!s.cast && keyedSheet(CAT_IDLE_SHEET)) {
+    // śpi: statyczna klatka z zamkniętymi oczami (frame 4) + oddech + Zzz; budzi się po STARCIE
+    const breath = 1 + Math.sin(now * 1.3) * 0.01;
     ctx.save(); ctx.translate(cx, baselineY); ctx.scale(1, breath); ctx.translate(-cx, -baselineY);
-    drawCatFrame(ctx, CAT_FRONT_IDLE, 0, 1, 1, cx, baselineY, catH);
+    drawCatFrame(ctx, CAT_IDLE_SHEET, CAT_SLEEP_FRAME, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
     ctx.restore();
+    drawDozeZ(ctx, cx - catH * 0.22, baselineY - catH * 1.02, now);
   } else {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
