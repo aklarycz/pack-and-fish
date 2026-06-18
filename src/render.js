@@ -53,7 +53,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b9'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b10'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -223,13 +223,14 @@ function renderHome(ctx, s) {
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
   ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.13, H * 0.010, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
-  const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
+  const castSheet = keyedSheet(CAT_CAST_SHEET), idleStill = img(CAT_FRONT_IDLE);
   if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
     drawSheetStable(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
-  } else if (!s.cast && idleSheet) {
-    const f = Math.floor(now * 1000 / 260) % CAT_FRAMES; // wolniej = spokojniej
-    drawSheetStable(ctx, CAT_IDLE_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+  } else if (!s.cast && ready(idleStill)) {
+    // idle: czysta poza z alfą grafika (zero białych kieszeni / ucięć stołka), delikatny oddech
+    const bob = Math.sin(now * 1.6) * H * 0.004;
+    drawSheetStable(ctx, CAT_FRONT_IDLE, 0, 1, 1, cx, baselineY + bob, catH);
   } else {
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
     if (catIm) {
@@ -411,7 +412,7 @@ function unionBBox(src, cols, rows, inset) {
 // Rysuje klatkę kota STABILNIE i w STAŁYM rozmiarze: treść (unia bbox) skalowana do contentH,
 // środek-X treści w cx, DÓŁ treści (stołek) na baselineY — kot CAŁY (nic nie ucięte) i tego
 // samego rozmiaru niezależnie od kadrowania sheetu. Inset tnie przeciek z sąsiednich klatek.
-function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, contentH, inset = 0.04) {
+function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, contentH, inset = 0) {
   const c = keyedSheet(src); if (!c) return;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
   const fw = IW / cols, fh = IH / rows;
