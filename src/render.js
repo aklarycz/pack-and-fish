@@ -67,7 +67,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b19'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b20'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -231,23 +231,23 @@ function renderHome(ctx, s) {
   ctx.fillText(A.name, cx, H * 0.148);
   ctx.restore();
 
-  // bohater Tofu — FRONT; cięcie nóżek stołka osadzone na krawędzi molo (~0.555H), mniejszy
-  const baselineY = H * 0.555, catH = H * 0.21, catCy = baselineY - catH * 0.5;
+  // bohater Tofu — FRONT, pojedyncza poza (CAŁY stołek), stołek na deskach molo (~0.55H)
+  const baselineY = H * 0.55, catH = H * 0.34, catCy = baselineY - catH * 0.5;
   catRect = { x: cx - W * 0.22, y: baselineY - catH * 0.9, w: W * 0.44, h: catH * 0.9 };
-  // cień kontaktowy (maskuje płaskie cięcie stołka, gruntuje na molo)
-  ctx.fillStyle = 'rgba(0,0,0,0.22)';
-  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.17, H * 0.013, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.15, H * 0.012, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
-  const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
+  const castSheet = keyedSheet(CAT_CAST_SHEET);
   if (s.cast && castSheet) {
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
     drawCatFrame(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
-  } else if (!s.cast && idleSheet) {
-    // śpi: statyczna klatka z zamkniętymi oczami + delikatny oddech (kotwiczony do molo);
-    // budzi się i zarzuca po STARCIE. Ciągłe Zzz pasuje do snu.
+  } else if (!s.cast && ready(img(CAT_FRONT_IDLE))) {
+    // śpi: pojedyncza poza (CAŁY stołek) + senne oczka rysowane na stałe + oddech; Zzz ciągłe;
+    // budzi się i zarzuca po STARCIE.
     const breath = 1 + Math.sin(now * 1.3) * 0.01;
     ctx.save(); ctx.translate(cx, baselineY); ctx.scale(1, breath); ctx.translate(-cx, -baselineY);
-    drawCatFrame(ctx, CAT_IDLE_SHEET, CAT_SLEEP_FRAME, CAT_COLS, CAT_ROWS, cx, baselineY, catH);
+    drawCatFrame(ctx, CAT_FRONT_IDLE, 0, 1, 1, cx, baselineY, catH);
+    drawSleepEyes(ctx);
     ctx.restore();
     drawDozeZ(ctx, cx - catH * 0.22, baselineY - catH * 1.02, now); // Zzz nad główką
   } else {
@@ -462,6 +462,27 @@ function drawCatFrame(ctx, src, frame, cols, rows, cx, baselineY, contentH) {
   const destX = cx - (lb.x + lb.w / 2) * sc;
   const destY = baselineY - (lb.y + lb.h) * sc;
   ctx.drawImage(c, x0, y0, cw, ch, destX, destY, cw * sc, ch * sc);
+  // transformacja: ułamek obrazu (fx,fy)∈[0,1] -> ekran (do rysowania sennych oczek)
+  _catXf = { src, sc, destX, destY, x0, y0, iw: IW, ih: IH };
+}
+let _catXf = null;
+
+// Senne (zamknięte na stałe) oczka rysowane na pozie z otwartymi oczami: kremowa powieka
+// zakrywa oko + delikatny łuk „‿" (spokojnie przymknięte). Pozycje = ułamki obrazu (skalibr.).
+const EYES = [{ fx: 0.444, fy: 0.384 }, { fx: 0.551, fy: 0.384 }];
+const EYE_RX = 0.062, EYE_RY = 0.060;
+function drawSleepEyes(ctx) {
+  const xf = _catXf; if (!xf) return;
+  for (const e of EYES) {
+    const X = xf.destX + (e.fx * xf.iw - xf.x0) * xf.sc;
+    const Y = xf.destY + (e.fy * xf.ih - xf.y0) * xf.sc;
+    const rx = EYE_RX * xf.iw * xf.sc, ry = EYE_RY * xf.ih * xf.sc;
+    ctx.fillStyle = '#f7ddb0'; // kremowa powieka (kolor pyszczka) — zakrywa otwarte oko
+    ctx.beginPath(); ctx.ellipse(X, Y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    // spokojnie przymknięte oczko: łagodny łuk w dół „‿"
+    ctx.strokeStyle = 'rgba(70,45,30,0.8)'; ctx.lineWidth = Math.max(1.5, rx * 0.16); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(X - rx * 0.72, Y - ry * 0.05); ctx.quadraticCurveTo(X, Y + ry * 0.42, X + rx * 0.72, Y - ry * 0.05); ctx.stroke(); ctx.lineCap = 'butt';
+  }
 }
 
 // pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
