@@ -219,18 +219,18 @@ function renderHome(ctx, s) {
   chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');          // gemy (placeholder)
   chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');    // energia (brak gate'u)
 
-  // bohater Tofu — FRONT; stopy na linii (baseline), żeby pod nim było widać jezioro
-  const baselineY = H * 0.62, cellH = H * 0.40, catCy = baselineY - cellH * 0.45, catH = cellH;
-  catRect = { x: cx - W * 0.26, y: baselineY - cellH * 0.9, w: W * 0.52, h: cellH * 0.9 };
+  // bohater Tofu — FRONT; stopy na linii (baseline), mniejszy, spokojniejszy
+  const baselineY = H * 0.60, cellH = H * 0.34, catCy = baselineY - cellH * 0.45, catH = cellH;
+  catRect = { x: cx - W * 0.24, y: baselineY - cellH * 0.9, w: W * 0.48, h: cellH * 0.9 };
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.16, H * 0.012, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx, baselineY, W * 0.14, H * 0.011, 0, 0, Math.PI * 2); ctx.fill();
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
   const idleSheet = keyedSheet(CAT_IDLE_SHEET), castSheet = keyedSheet(CAT_CAST_SHEET);
   if (s.cast && castSheet) {                       // klatki: cast (stabilizowane)
     const f = Math.min(CAT_FRAMES - 1, Math.floor(s.cast.t / CAST_DUR * CAT_FRAMES));
     drawSheetStable(ctx, CAT_CAST_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, cellH);
-  } else if (!s.cast && idleSheet) {               // klatki: idle (pętla, stabilizowane)
-    const f = Math.floor(now * 1000 / 140) % CAT_FRAMES;
+  } else if (!s.cast && idleSheet) {               // klatki: idle (pętla wolniejsza, stabilizowana)
+    const f = Math.floor(now * 1000 / 230) % CAT_FRAMES;
     drawSheetStable(ctx, CAT_IDLE_SHEET, f, CAT_COLS, CAT_ROWS, cx, baselineY, cellH);
   } else {                                         // fallback: pojedyncza poza + tween z kodu
     const catIm = (s.cast ? keyedSheet(CAT_FRONT_CAST) : null) || keyedSheet(CAT_FRONT_IDLE);
@@ -344,39 +344,43 @@ function drawSheet(ctx, im, frame, cols, rows, cx, cy, targetH, inset = 0) {
 }
 
 // bounding-box nieprzezroczystej treści w komórce siatki (do stabilizacji animacji). Cache.
+// bbox treści w PRZYCIĘTEJ (inset) części komórki — inset wycina margines, gdzie podchodzą
+// fragmenty sąsiednich klatek. Cache.
 const _bbox = {};
-function cellContentBBox(src, frame, cols, rows) {
-  const key = src + '|' + cols + 'x' + rows + '|' + frame;
+function cellContentBBox(src, frame, cols, rows, inset) {
+  const key = src + '|' + cols + 'x' + rows + '|' + frame + '|' + inset;
   if (_bbox[key]) return _bbox[key];
   const c = keyedSheet(src); if (!c) return null;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
-  const fw = Math.floor(IW / cols), fh = Math.floor(IH / rows);
+  const fw = IW / cols, fh = IH / rows;
   const col = frame % cols, row = Math.floor(frame / cols) % rows;
-  const ox = col * fw, oy = row * fh;
+  const x0 = Math.floor(col * fw + fw * inset), y0 = Math.floor(row * fh + fh * inset);
+  const w = Math.floor(fw * (1 - 2 * inset)), h = Math.floor(fh * (1 - 2 * inset));
   let ctxR;
   if (c.getContext) ctxR = c.getContext('2d');
   else { const t = document.createElement('canvas'); t.width = IW; t.height = IH; ctxR = t.getContext('2d'); ctxR.drawImage(c, 0, 0); }
-  let d; try { d = ctxR.getImageData(ox, oy, fw, fh).data; } catch (e) { const bb = { x: ox, y: oy, w: fw, h: fh }; _bbox[key] = bb; return bb; }
-  let minx = fw, miny = fh, maxx = 0, maxy = 0, found = false;
-  for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) {
-    if (d[(y * fw + x) * 4 + 3] > 25) { found = true; if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y; }
+  let d; try { d = ctxR.getImageData(x0, y0, w, h).data; } catch (e) { const bb = { x: x0, y: y0, w, h }; _bbox[key] = bb; return bb; }
+  let minx = w, miny = h, maxx = 0, maxy = 0, found = false;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (d[(y * w + x) * 4 + 3] > 25) { found = true; if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y; }
   }
-  const bb = found ? { x: ox + minx, y: oy + miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: ox, y: oy, w: fw, h: fh };
+  const bb = found ? { x: x0 + minx, y: y0 + miny, w: maxx - minx + 1, h: maxy - miny + 1 } : { x: x0, y: y0, w, h };
   _bbox[key] = bb; return bb;
 }
 
-// stabilna klatka: skala stała (cellH), środek-X i DÓŁ treści przyklejone do (cx, baselineY)
-// — kasuje skakanie na boki/góra-dół przy niespójnych klatkach GPT (wędka może iść w górę).
-function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, cellH) {
+// stabilna klatka: rysuje tylko PRZYCIĘTĄ komórkę (bez sąsiadów), stała skala, środek-X i DÓŁ
+// treści przyklejone do (cx, baselineY) — koniec skakania i fragmentów z innych klatek.
+function drawSheetStable(ctx, src, frame, cols, rows, cx, baselineY, cellH, inset = 0.08) {
   const c = keyedSheet(src); if (!c) return;
   const IW = c.naturalWidth || c.width, IH = c.naturalHeight || c.height;
   const fw = IW / cols, fh = IH / rows;
   const col = frame % cols, row = Math.floor(frame / cols) % rows;
-  const bb = cellContentBBox(src, frame, cols, rows); if (!bb) return;
-  const sc = cellH / fh;
-  const ccx = (bb.x - col * fw) + bb.w / 2;   // środek-X treści w komórce
-  const cby = (bb.y - row * fh) + bb.h;        // dół treści w komórce (stopy/krzesło)
-  ctx.drawImage(c, col * fw, row * fh, fw, fh, cx - ccx * sc, baselineY - cby * sc, fw * sc, fh * sc);
+  const x0 = col * fw + fw * inset, y0 = row * fh + fh * inset;
+  const cw = fw * (1 - 2 * inset), ch = fh * (1 - 2 * inset);
+  const bb = cellContentBBox(src, frame, cols, rows, inset); if (!bb) return;
+  const sc = cellH / ch;
+  const ccx = (bb.x - x0) + bb.w / 2, cby = (bb.y - y0) + bb.h;
+  ctx.drawImage(c, x0, y0, cw, ch, cx - ccx * sc, baselineY - cby * sc, cw * sc, ch * sc);
 }
 
 // pojedynczy sprite wyśrodkowany; dy/tilt/scaleX/scaleY do animacji z kodu (squash&stretch)
