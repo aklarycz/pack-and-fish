@@ -121,7 +121,7 @@ const CAT_DOZE = 'assets/cat/cat-doze-sheet-6x1.png';
 const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b38'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b39'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 function drawFishSprite(ctx, im, cx, cy, radius, dir, alpha) {
   const w = radius * SPRITE_SCALE;
@@ -911,20 +911,29 @@ function drawScrollTiles(ctx, im, camY, brightness) {
   ctx.restore();
 }
 
-// "shader wody": snopy światła (god rays) z powierzchni — animowane, zanikają z głębokością
+// "shader wody": miękkie snopy światła z powierzchni — rozmyte krawędzie, pochylone pod kątem,
+// migoczą i SZYBKO zanikają z głębokością (przy dnie znikają zupełnie).
 function drawGodRays(ctx, now, df) {
-  const W = WORLD.W, H = WORLD.H, a = (1 - df) * 0.16;
-  if (a <= 0.01) return;
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  for (let k = 0; k < 4; k++) {
-    const x = W * (0.18 + 0.21 * k) + Math.sin(now * 0.35 + k * 1.7) * W * 0.05;
-    const w = W * (0.09 + 0.025 * (k % 2)), endY = H * 0.7;
+  const W = WORLD.W, H = WORLD.H;
+  const fade = Math.pow(Math.max(0, 1 - df), 1.7); // wygaszanie z głębią (szybsze niż liniowe)
+  const base = fade * 0.12;
+  if (base <= 0.006) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  if ('filter' in ctx) ctx.filter = `blur(${Math.max(6, Math.round(W * 0.04))}px)`; // miękkie krawędzie
+  for (let k = 0; k < 3; k++) {
+    const x = W * (0.27 + 0.23 * k) + Math.sin(now * 0.22 + k * 2.1) * W * 0.035;
+    const tilt = W * 0.12, w = W * (0.05 + 0.018 * (k % 2));
+    const flick = 0.65 + 0.35 * Math.sin(now * 0.9 + k * 1.3); // migotanie jasności
+    const endY = H * (0.5 + 0.12 * (k % 2));
     const grd = ctx.createLinearGradient(0, 0, 0, endY);
-    grd.addColorStop(0, `rgba(160,215,255,${a})`); grd.addColorStop(1, 'rgba(160,215,255,0)');
+    grd.addColorStop(0, `rgba(175,222,255,${(base * flick).toFixed(3)})`);
+    grd.addColorStop(0.6, `rgba(175,222,255,${(base * flick * 0.4).toFixed(3)})`);
+    grd.addColorStop(1, 'rgba(175,222,255,0)');
     ctx.fillStyle = grd;
     ctx.beginPath();
-    ctx.moveTo(x - w / 2, 0); ctx.lineTo(x + w / 2, 0);
-    ctx.lineTo(x + w * 1.6, endY); ctx.lineTo(x - w * 1.6, endY);
+    ctx.moveTo(x - w, 0); ctx.lineTo(x + w, 0);
+    ctx.lineTo(x + tilt + w * 1.8, endY); ctx.lineTo(x + tilt - w * 1.8, endY);
     ctx.closePath(); ctx.fill();
   }
   ctx.restore();
