@@ -2,7 +2,7 @@ import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, CAS
 import { computeStars } from './logic/scoring.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
-const ASSET_VER = 'b40'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
+const ASSET_VER = 'b46'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
 const _imgCache = {};
 function img(src) {
   let im = _imgCache[src];
@@ -82,6 +82,8 @@ const FISH_SPRITE = {
   twardziel: 'assets/fish/muskie.png',  // duża = muskie
 };
 const BUBBLE_SRC = 'assets/bubble.png';
+// itemy (hak/akcesoria) — ikony plecaka + nakładki na hak w minigrze
+const ITEM_SPRITE = { rusty_hook: 'assets/items/hook.png', bronze: 'assets/items/bronze.png', anchor: 'assets/items/anchor.png' };
 const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla (Home) + fallback kurtyny
 const CURTAIN = 'assets/arenas/arena-01-curtain.png'; // dedykowana kurtyna przejścia (pełna wysokość, alfa)
 const REVEAL_HOLD = 0.3;  // ile kurtyna trzyma ZAKRYTE po wejściu pod wodę ("loading")
@@ -142,7 +144,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b45'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b46'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -690,12 +692,19 @@ function roundedBtn(ctx, r, color, label) {
 }
 
 function drawItemCell(ctx, it, x, y, cell) {
-  const pad = cell * 0.12;
-  const col = it.kind === 'hook' ? '#9aa3ad' : it.id === 'bronze' ? '#c87f3a' : '#5aa9e0';
-  const label = it.kind === 'hook' ? 'HAK' : it.id === 'bronze' ? 'BRĄZ' : 'KOTW';
-  fillRR(ctx, x + pad, y + pad, cell - 2 * pad, cell - 2 * pad, 6, col);
-  ctx.fillStyle = '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(cell * 0.15)}px sans-serif`;
-  ctx.fillText(label, x + cell / 2, y + cell / 2 + cell * 0.06);
+  const pad = cell * 0.1;
+  const im = keyedEdge(ITEM_SPRITE[it.id]);
+  if (im) {
+    const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+    const box = cell - 2 * pad, sc = Math.min(box / iw, box / ih), w = iw * sc, h = ih * sc;
+    ctx.drawImage(im, x + cell / 2 - w / 2, y + cell / 2 - h / 2, w, h);
+  } else { // fallback: kolorowy kafel + etykieta (zanim ikona się wczyta)
+    const col = it.kind === 'hook' ? '#9aa3ad' : it.id === 'bronze' ? '#c87f3a' : '#5aa9e0';
+    const label = it.kind === 'hook' ? 'HAK' : it.id === 'bronze' ? 'BRĄZ' : 'KOTW';
+    fillRR(ctx, x + pad, y + pad, cell - 2 * pad, cell - 2 * pad, 6, col);
+    ctx.fillStyle = '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(cell * 0.15)}px sans-serif`;
+    ctx.fillText(label, x + cell / 2, y + cell / 2 + cell * 0.06);
+  }
 }
 
 function renderBackpack(ctx, s) {
@@ -878,8 +887,19 @@ function renderDescent(ctx, s, hookX, hookY) {
     hookX - drag * 1.9 + sway * 0.6, hookY * 0.72, // cp2
     hookX, hookY);                                 // koniec przy haku
   ctx.stroke(); ctx.lineCap = 'butt';
-  ctx.fillStyle = '#dfe9f5'; ctx.beginPath(); ctx.arc(hookX, hookY, 8, 0, Math.PI * 2); ctx.fill();
-  // (docelowo: asset haka + nakładane ikony akcesoriów; placeholder = kółko)
+  // hak: zardzewiały bazowo, BRĄZOWY gdy podpięty brązowy hak (atk≥8); kotwiczka nakładana gdy +1 zacięcie
+  const bronzeOn = s.hook && s.hook.atk >= 8;
+  const trebleOn = s.hook && s.hook.maxLatch >= 2;
+  const hookH = WORLD.H * 0.075;
+  if (trebleOn) { // kotwiczka (treble) za hakiem — eyelet przy hookY, prongi wystają wokół
+    const tim = keyedEdge(ITEM_SPRITE.anchor);
+    if (tim) { const th = hookH * 1.1, tw = th * (tim.naturalWidth || tim.width) / (tim.naturalHeight || tim.height); ctx.globalAlpha = 0.95; ctx.drawImage(tim, hookX - tw / 2, hookY, tw, th); ctx.globalAlpha = 1; }
+  }
+  const him = keyedEdge(bronzeOn ? ITEM_SPRITE.bronze : ITEM_SPRITE.rusty_hook);
+  if (him) {
+    const hw = hookH * (him.naturalWidth || him.width) / (him.naturalHeight || him.height);
+    ctx.drawImage(him, hookX - hw / 2, hookY, hw, hookH); // eyelet (góra obrazka) przy hookY → żyłka łączy się z oczkiem
+  } else { ctx.fillStyle = '#dfe9f5'; ctx.beginPath(); ctx.arc(hookX, hookY, 8, 0, Math.PI * 2); ctx.fill(); }
 
   // top bar (HUD) na wierzchu — hak/ryby pod niego nie wchodzą
   ctx.fillStyle = 'rgba(4,18,31,0.9)'; ctx.fillRect(0, 0, WORLD.W, WORLD.topBarH);
