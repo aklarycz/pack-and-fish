@@ -144,7 +144,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b51'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b52'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -264,6 +264,33 @@ function tutArrow(ctx, x1, y1, x2, y2) {
   ctx.closePath(); ctx.fillStyle = '#ffcb45'; ctx.fill(); ctx.lineCap = 'butt';
 }
 
+// Delikatny ruch wody na Home: miękkie, dryfujące refleksy + cienkie błyski na tafli (additive).
+function drawWaterShimmer(ctx, W, H, t) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 6; i++) {
+    const ph = t * 0.5 + i * 1.7;
+    const x = W * (0.12 + 0.16 * i) + Math.sin(ph) * W * 0.05;
+    const y = H * (0.58 + 0.035 * i) + Math.sin(ph * 1.3) * H * 0.006;
+    const r = W * (0.07 + 0.025 * Math.sin(ph * 0.8));
+    const a = (0.5 + 0.5 * Math.sin(ph)) * 0.05;
+    if (a < 0.004 || r <= 0) continue;
+    const grd = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grd.addColorStop(0, `rgba(200,235,255,${a.toFixed(3)})`); grd.addColorStop(1, 'rgba(200,235,255,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.32, 0, 0, Math.PI * 2); ctx.fill(); // spłaszczone = refleks
+  }
+  for (let i = 0; i < 4; i++) { // cienkie poziome błyski bliżej dołu
+    const ph = t * 0.9 + i * 2.1;
+    const x = W * (0.2 + 0.2 * i) + Math.sin(ph * 1.1) * W * 0.04;
+    const y = H * (0.70 + 0.025 * i), w = W * 0.12, a = (0.5 + 0.5 * Math.sin(ph)) * 0.04;
+    const grd = ctx.createLinearGradient(x - w, 0, x + w, 0);
+    grd.addColorStop(0, 'rgba(210,240,255,0)'); grd.addColorStop(0.5, `rgba(210,240,255,${a.toFixed(3)})`); grd.addColorStop(1, 'rgba(210,240,255,0)');
+    ctx.fillStyle = grd; ctx.fillRect(x - w, y, w * 2, Math.max(1.5, H * 0.003));
+  }
+  ctx.restore();
+}
+
 // --- HOME: arena (góra, scena/Tofu per-arena) + pasek stage 1-10 nad przyciskiem ---
 function renderHome(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
@@ -296,6 +323,9 @@ function renderHome(ctx, s) {
   g = ctx.createLinearGradient(0, H * 0.62, 0, H);
   g.addColorStop(0, 'rgba(6,18,28,0)'); g.addColorStop(1, 'rgba(6,18,28,0.9)');
   ctx.fillStyle = g; ctx.fillRect(0, H * 0.62, W, H * 0.38);
+
+  // delikatny ruch wody — proceduralny shimmer (woda w grafice jest statyczna)
+  drawWaterShimmer(ctx, W, H, (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000);
 
   // === UI górne (HUD + nazwa areny) — ukryte przy zarzucie ===
   if (!s.cast) {
