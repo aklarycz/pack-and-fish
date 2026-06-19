@@ -242,22 +242,23 @@ export function registerEscape(s) {
 function finishDescent(s, reason = 'fail') {
   s.mode = 'END';
   recompute(s);
-  const thr = STAGES[s.stageIndex].stars;
-  s.stars = computeStars(s.score, thr);
   const st = s.progress.stages[s.stageIndex];
   const prevStars = st.stars;
-  st.bestScore = Math.max(st.bestScore, s.score);
-  st.stars = Math.max(st.stars, s.stars);
-  s.progress.coins += s.coinsEarned;
-  let newUnlock = false;
-  const next = s.stageIndex + 1;
-  if (s.stars >= 1 && next < STAGES.length && !s.progress.stages[next].unlocked) {
-    s.progress.stages[next].unlocked = true;
-    newUnlock = true;
-  }
-  let chestEarned = false;                 // skrzynka JEDNORAZOWA: clear z ≥1★, raz na stage
-  if (reason === 'cleared' && s.stars >= 1 && !st.chestClaimed) {
-    s.progress.pendingChests += 1; st.chestClaimed = true; chestEarned = true;
+  s.progress.coins += s.coinsEarned;       // złowione ryby = zarobione monety (nawet przy przegranej)
+  let newUnlock = false, chestEarned = false;
+  if (reason === 'cleared') {              // tylko WYCZYSZCZENIE łowiska liczy gwiazdki/progres
+    s.stars = computeStars(s.score, STAGES[s.stageIndex].stars);
+    st.bestScore = Math.max(st.bestScore, s.score);
+    st.stars = Math.max(st.stars, s.stars);
+    const next = s.stageIndex + 1;
+    if (s.stars >= 1 && next < STAGES.length && !s.progress.stages[next].unlocked) {
+      s.progress.stages[next].unlocked = true; newUnlock = true;
+    }
+    if (s.stars >= 1 && !st.chestClaimed) {          // skrzynka JEDNORAZOWA: clear z ≥1★
+      s.progress.pendingChests += 1; st.chestClaimed = true; chestEarned = true;
+    }
+  } else {
+    s.stars = 0;                           // PRZEGRANA (utrata 3 żyć) — 0 gwiazdek, bez odblokowania/skrzyni
   }
   saveProgress(s.progress);
   s.lastResult = {

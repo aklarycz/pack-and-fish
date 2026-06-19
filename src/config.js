@@ -110,10 +110,9 @@ export const FISH_TYPES = {
   // okna szersze (łapanie z zapasem, nie "na styk"); radius powiększany etapami (większe ryby, ostatnio +15%).
   // bass (mała): szybka, UCIEKA od haka; łatwa do złapania (niski hp)
   plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 37, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
-  // sum (średnia): wolniejszy, UCIEKA; okno 4.2 (z 3.6) — z atk5+rakietnicą łowialny od ~stage 3,
-  // na stage 1-2 (sam hak) wyzwanie (atk·okno < hp). NIEłowialny samym hakiem przy pełnym atk5 na dnie
-  // (5·4.2=21 < 20·1.3≈26) — celowa zależność od rakietnicy/upgrade'ów.
-  sredniak:  { id: 'sredniak',  hp: 20, window: 4.2, speed: 72,  aggroRange: 150, radius: 63, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
+  // sum (średnia): wolniejszy, UCIEKA; ŁOWIALNY gołym brązem (atk4·okno4.2 = 16.8 dmg) przez cały
+  // stage 1 — hp 12 (z 20), na dnie ~×1.28 → 15.3 < 16.8. Z kotwicą/rakietnicą trywialny.
+  sredniak:  { id: 'sredniak',  hp: 12, window: 4.2, speed: 72,  aggroRange: 150, radius: 63, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
   // muskie (duża): ATAKUJE hak, NIE DO ZŁAPANIA bazowym sprzętem (8·2.4=19.2 ≪ 40; z kotwicą 9·2.4=21.6 ≪ 40)
   twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 99, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };

@@ -64,18 +64,18 @@ test('addDepth and registerStun update score during descent', () => {
   assert.equal(s.stunned, 1);
 });
 
-test('three escapes end the stage; >=1 star unlocks next and saves stars', () => {
+test('losing all 3 lives = fail: 0 stars, no unlock, no chest (even with high score)', () => {
   const s = createGame(); placeHook(s, 0, 0); startStage(s);
-  s.stunnedPoints = 300;                        // wymuś wysoki wynik
+  s.stunnedPoints = 300;                        // wysoki wynik, ale i tak przegrana
   registerEscape(s); registerEscape(s);
   assert.equal(s.mode, 'DESCENT');
   registerEscape(s);
   assert.equal(s.mode, 'END');
-  assert.ok(s.stars >= 1);
-  assert.equal(s.progress.stages[0].stars, s.stars);
-  assert.ok(s.progress.stages[0].bestScore >= 300);
-  assert.equal(s.progress.stages[1].unlocked, true);
-  assert.equal(s.lastResult.newUnlock, true);
+  assert.equal(s.stars, 0);                     // przegrana = brak gwiazdek
+  assert.equal(s.progress.stages[0].stars, 0);
+  assert.equal(s.progress.stages[1].unlocked, false); // brak odblokowania
+  assert.equal(s.lastResult.cleared, false);
+  assert.equal(s.lastResult.newUnlock, false);
 });
 
 test('chest earned only on clear with >=1 star; first chest forces the anchor', () => {
