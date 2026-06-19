@@ -146,7 +146,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b61'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b62'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -853,6 +853,7 @@ function renderBackpack(ctx, s) {
 
 function renderDescent(ctx, s, hookX, hookY) {
   const camY = s.depthPx; // świat -> ekran: screenY = worldY - camY
+  const hookH = WORLD.H * 0.085; // rozmiar haka — używany też wcześniej (pociski) → liczony na górze
 
   // gradient głębi — przyciemnia się wraz z głębokością. df liczone od głębi ABSOLUTNEJ
   // (lokalna + offset areny) i skalowane do ~55 m, by ciemnienie było WYRAŹNE w grywalnym zakresie.
@@ -957,7 +958,6 @@ function renderDescent(ctx, s, hookX, hookY) {
   // za hakiem → różnica (drag) wygina żyłkę w stronę przeciwną do ruchu; do tego delikatna fala.
   // hak rysujemy OSTRZEM (dół obrazka) na linii zaczepu (hookY) — ryby łapią się na ostrzu,
   // oczko jest WYŻEJ i tam łączy się żyłka.
-  const hookH = WORLD.H * 0.085;
   const eyeletY = hookY - hookH * 0.82;           // oczko ~ górna część obrazka
   _lineLagX = _lineLagX === null ? hookX : _lineLagX + (hookX - _lineLagX) * 0.12;
   const drag = hookX - _lineLagX;                 // proxy prędkości bocznej
