@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b69'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b70'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -180,30 +180,17 @@ function renderSplash(ctx, s) {
   const bg = img(SPLASH_SRC);
   if (ready(bg)) { ctx.fillStyle = '#0b1f33'; ctx.fillRect(0, 0, W, H); drawCover(ctx, bg, 0, 0, W, H); }
   else { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1e6390'); g.addColorStop(1, '#06223a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
-  // NASZE ryby dryfujące w głębi (zamiast spławików) — prawdziwe sprite'y z gry, delikatny ruch
-  const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
-  const deepFish = [
-    { type: 'twardziel', x: 0.26, y: 0.72, r: 55, dir: 1,  dark: 0.55 },
-    { type: 'sredniak',  x: 0.76, y: 0.86, r: 40, dir: -1, dark: 0.62 },
-    { type: 'plotka',    x: 0.60, y: 0.66, r: 26, dir: 1,  dark: 0.50 },
-  ];
-  for (const f of deepFish) {
-    const im = keyedEdge(FISH_SPRITE[f.type]); if (!im) continue;
-    const x = W * f.x + Math.sin(tt * 0.35 + f.y * 9) * W * 0.04;
-    const y = H * f.y + Math.sin(tt * 0.5 + f.x * 9) * H * 0.008;
-    drawFishSprite(ctx, im, x, y, f.r, f.dir, 0.92, Math.sin(tt + f.x) * 0.05, f.dark);
-  }
-  // scrim dołu (czytelność logo/przycisku na dowolnym arcie) — RYSOWANY NA RYBACH, żeby przyciski czytelne
-  let sc = ctx.createLinearGradient(0, H * 0.55, 0, H);
+  // scrim dołu (czytelność przycisków na dowolnym arcie)
+  let sc = ctx.createLinearGradient(0, H * 0.62, 0, H);
   sc.addColorStop(0, 'rgba(4,18,31,0)'); sc.addColorStop(1, 'rgba(4,18,31,0.7)');
-  ctx.fillStyle = sc; ctx.fillRect(0, H * 0.55, W, H * 0.45);
+  ctx.fillStyle = sc; ctx.fillRect(0, H * 0.62, W, H * 0.38);
   // logo (PNG) lub fallback tekstowy
   const logo = keyedEdge(LOGO_SRC); // logo ma zapieczone jasne tło → wytnij krawędziowo
   if (logo) {
     const ar = (logo.width || 1) / (logo.height || 1); // skala po WYSOKOŚCI (zachowaj proporcje)
-    let lh = H * 0.24, lw = lh * ar;
-    if (lw > W * 0.92) { lw = W * 0.92; lh = lw / ar; }
-    ctx.drawImage(logo, W / 2 - lw / 2, H * 0.02, lw, lh);
+    let lh = H * 0.30, lw = lh * ar;
+    if (lw > W * 0.96) { lw = W * 0.96; lh = lw / ar; }
+    ctx.drawImage(logo, W / 2 - lw / 2, H * 0.012, lw, lh);
   } else {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd24a'; ctx.font = `bold ${Math.round(H * 0.078)}px sans-serif`;
