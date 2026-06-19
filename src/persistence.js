@@ -1,6 +1,6 @@
 // Zapis postępu w localStorage (gwiazdki/best score/odblokowania + hak).
 // Guard na środowisko bez localStorage (testy Node) — wtedy działa na domyślnych.
-const KEY = 'packfish_progress_v4'; // bump = reset progresu (v4 = start z brązowym hakiem w ekwipunku)
+const KEY = 'packfish_progress_v5'; // bump = reset progresu (v5 = zardzewiały hak pre-założony w gridzie)
 
 export function defaultProgress(stageCount) {
   const stages = [];
@@ -9,8 +9,10 @@ export function defaultProgress(stageCount) {
   }
   return {
     stages,
-    hookEquipped: false,
-    grid: null,          // zapisany układ plecaka (cells) — null = pusty
+    hookEquipped: true,
+    // zardzewiały hak jest DEFAULT (pre-założony w rogu) — nie jest itemem do zakładania.
+    // Itemy to tylko brązowy hak (z tutoriala) i kotwica (z 1. skrzyni).
+    grid: ['rusty_hook', null, null, null, null, null, null, null, null],
     coins: 0,            // soft currency (do mergowania akcesoriów)
     pendingChests: 0,    // skrzynki do otwarcia na Home
     gotAnchor: false,    // czy pierwsza (wymuszona) Kotwica już przyznana

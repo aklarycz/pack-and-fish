@@ -7,13 +7,15 @@ import {
 } from '../src/state.js';
 import { STARTER_HOOK, FISH_TYPES, WORLD, STAGES } from '../src/config.js';
 
-test('new game starts at HOME, stage 0 unlocked, rest locked, no hook', () => {
+test('new game: HOME, stage 0 unlocked, rest locked, rusty hook pre-equipped (default, atk1)', () => {
   const s = createGame();
   assert.equal(s.mode, 'HOME');
   assert.equal(s.stageIndex, 0);
   assert.equal(stageUnlocked(s, 0), true);
   assert.equal(stageUnlocked(s, 1), false);
-  assert.equal(s.hook, null);
+  assert.ok(s.hook);                          // zardzewiały hak jest DEFAULT (pre-założony)
+  assert.equal(s.hook.atk, STARTER_HOOK.atk); // atk 1
+  assert.equal(s.hook.maxLatch, 1);
 });
 
 test('carouselMove clamps to stage range', () => {
@@ -30,19 +32,15 @@ test('backpack open/close toggles mode', () => {
   closeBackpack(s); assert.equal(s.mode, 'HOME');
 });
 
-test('placeHook equips hook (aggregated stats) and marks progress', () => {
-  const s = createGame();
-  assert.equal(placeHook(s, 1, 1), true);
-  assert.ok(s.hook);
-  assert.equal(s.hook.maxLatch, 1);
-  assert.equal(s.hook.atk, STARTER_HOOK.atk);
-  assert.equal(s.progress.hookEquipped, true);
+test('bronze hook accessory (connected) raises atk to 8', () => {
+  const s = createGame();                       // rusty pre-equipped (atk1) + bronze in inventory
+  assert.equal(s.hook.atk, STARTER_HOOK.atk);   // 1
+  assert.equal(placeAccessory(s, 'bronze'), true); // auto first free = adjacent to hook
+  assert.equal(s.hook.atk, 8);                  // 1 + 7
 });
 
-test('startStage needs a hook and an unlocked stage', () => {
+test('startStage needs an unlocked stage (hook is always present)', () => {
   const s = createGame();
-  assert.equal(startStage(s), false);          // brak haka
-  placeHook(s, 0, 0);
   s.stageIndex = 1;                             // zablokowany
   assert.equal(startStage(s), false);
   s.stageIndex = 0;
