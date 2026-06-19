@@ -85,6 +85,7 @@ const FISH_SPRITE = {
 const BUBBLE_SRC = 'assets/bubble.png';
 // itemy (hak/akcesoria) — ikony plecaka + nakładki na hak w minigrze
 const ITEM_SPRITE = { rusty_hook: 'assets/items/hook.png', bronze: 'assets/items/bronze.png', anchor: 'assets/items/anchor.png', rocket: 'assets/items/rocket.png' };
+const ROCKET_SHOT_SRC = 'assets/items/rocket-shot.png'; // pocisk (dziób w prawo → obracany w stronę celu)
 const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla (Home) + fallback kurtyny
 const CURTAIN = 'assets/arenas/arena-01-curtain.png'; // dedykowana kurtyna przejścia (pełna wysokość, alfa)
 const REVEAL_HOLD = 0.3;  // ile kurtyna trzyma ZAKRYTE po wejściu pod wodę ("loading")
@@ -145,7 +146,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b60'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b61'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -912,19 +913,24 @@ function renderDescent(ctx, s, hookX, hookY) {
       ctx.restore();
     }
   }
-  // pociski rakiet — smuga + świecąca główka lecące od haka do celu
+  // pociski rakiet — sprite obracany w stronę celu (fallback: proceduralna smuga)
+  const shotIm = keyedEdge(ROCKET_SHOT_SRC);
   for (const rk of s.rockets || []) {
     const f = rk.target; if (!f) continue;
     const p = Math.min(1, rk.t / 0.32);
     const x0 = rk.x, y0 = rk.y - camY, x1 = f.x, y1 = f.y - camY;
     const px = x0 + (x1 - x0) * p, py = y0 + (y1 - y0) * p;
-    const a = Math.atan2(y1 - y0, x1 - x0);
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,200,120,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(px - Math.cos(a) * 18, py - Math.sin(a) * 18); ctx.lineTo(px, py); ctx.stroke();
-    ctx.fillStyle = '#fff2c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,150,60,0.9)'; ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    const a = Math.atan2(y1 - y0, x1 - x0); // sprite dziobem w prawo (0 rad) → rotacja = kąt lotu
+    if (shotIm) {
+      const sw = hookH * 0.6, sh = sw * (shotIm.naturalHeight || 1) / (shotIm.naturalWidth || 1);
+      ctx.save(); ctx.translate(px, py); ctx.rotate(a); ctx.drawImage(shotIm, -sw / 2, -sh / 2, sw, sh); ctx.restore();
+    } else {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,200,120,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(px - Math.cos(a) * 18, py - Math.sin(a) * 18); ctx.lineTo(px, py); ctx.stroke();
+      ctx.fillStyle = '#fff2c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
   }
   // bańki z ogłuszonymi (sprite ryby + bańka)
   for (const b of s.bubbles || []) {
@@ -970,13 +976,13 @@ function renderDescent(ctx, s, hookX, hookY) {
   // nakładały). Sprite flipowany dla lewej strony, by zacisk patrzył na żyłkę.
   const sideItems = gridItems(s.grid, ITEMS).filter(g => ITEMS[g.id] && ITEMS[g.id].mount === 'side');
   sideItems.forEach((it, i) => {
-    const aSize = hookH * 0.66, stepY = hookH * 0.62;
-    const side = i % 2 === 0 ? 1 : -1;                 // naprzemiennie: 1. prawo, 2. lewo...
-    const ay = eyeletY - hookH * 0.15 - i * stepY;     // stackowane w górę od oczka
-    const ax = hookX + side * aSize * 0.40 + Math.sin(nowD * 1.6 + i) * 3; // lekko z boku linii (sway)
+    const aSize = hookH * 0.95, stepY = hookH * 0.8;
+    const ay = eyeletY - hookH * 0.35 - i * stepY;     // stackowane w górę nad oczkiem
+    const ax = hookX + Math.sin(nowD * 1.6 + i) * 3;   // WYŚRODKOWANE na żyłce (zacisk na linii) + sway
+    const flip = i % 2 === 1;                           // co drugi lustrzany (muzzle naprzemiennie)
     ctx.save();
     ctx.translate(ax, ay);
-    if (side < 0) ctx.scale(-1, 1);
+    if (flip) ctx.scale(-1, 1);
     drawItemSpan(ctx, ITEMS[it.id], -aSize / 2, -aSize / 2, aSize, aSize, false);
     ctx.restore();
   });
