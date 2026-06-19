@@ -144,7 +144,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b55'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b56'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -264,33 +264,34 @@ function tutArrow(ctx, x1, y1, x2, y2) {
   ctx.closePath(); ctx.fillStyle = '#ffcb45'; ctx.fill(); ctx.lineCap = 'butt';
 }
 
-// Ruch wody na Home: TYLKO cienkie, dryfujące zmarszczki/błyski w pasmach wody —
-// dalekie odbicie zachodu (za molem) + przybrzeże na dole. Bez okrągłych refleksów i
-// z dala od mola (te kółka źle wyglądały). Grafika wody jest statyczna → ten ruch ją ożywia.
+// Ruch wody na Home: miękki, WĘDRUJĄCY blask (sheen) przesuwający się po tafli — duże,
+// rozmyte refleksy światła clipowane do pasa wody (nie linie, nie kółka). Kilka warstw w
+// różnych fazach/prędkościach daje organiczny, przelewający się połysk jak shader na wodzie.
 function drawWaterShimmer(ctx, W, H, t) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  // pasma celowane w FAKTYCZNĄ wodę na grafice: dalekie odbicie zachodu (za molem) i
-  // główna tafla przybrzeża MIĘDZY molem a panelem STAGE (poprzednio celowałem pod UI).
-  const bands = [
-    { y0: 0.31, y1: 0.41, n: 3, col: '255,228,172', amax: 0.13, drift: 0.16 }, // dalekie odbicie (ciepłe)
-    { y0: 0.62, y1: 0.79, n: 6, col: '202,240,255', amax: 0.28, drift: 0.26 }, // główna tafla (chłodne błyski)
-  ];
-  for (const b of bands) {
-    for (let i = 0; i < b.n; i++) {
-      const ph = t * 0.85 + i * 1.7;
-      const y = H * (b.y0 + (b.y1 - b.y0) * ((i + 0.5) / b.n));
-      const cxw = W * 0.5 + Math.sin(ph * 0.7 + i) * W * b.drift;
-      const w = W * (0.22 + 0.07 * Math.sin(ph));
-      const a = (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(ph))) * b.amax;
-      const grd = ctx.createLinearGradient(cxw - w, 0, cxw + w, 0);
-      grd.addColorStop(0, `rgba(${b.col},0)`);
-      grd.addColorStop(0.5, `rgba(${b.col},${a.toFixed(3)})`);
-      grd.addColorStop(1, `rgba(${b.col},0)`);
-      ctx.fillStyle = grd;
-      ctx.fillRect(cxw - w, y, w * 2, Math.max(2, H * 0.0055));
-    }
-  }
+  // jeden przelewający się blask: wielki, rozmyty gradient radialny przycięty do pasa wody,
+  // którego środek wędruje w bok → światło przesuwa się po tafli.
+  const sheen = (y0f, y1f, speed, phase, col, amax) => {
+    const y0 = H * y0f, h = H * (y1f - y0f), cy = y0 + h * (0.45 + 0.1 * Math.sin(t * speed * 0.6 + phase));
+    const cx = W * (0.5 + 0.6 * Math.sin(t * speed + phase));
+    const rr = W * 0.6;
+    const a = amax * (0.5 + 0.5 * Math.sin(t * speed * 0.85 + phase * 1.3));
+    if (a < 0.003) return;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, y0, W, h); ctx.clip();
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr);
+    g.addColorStop(0, `rgba(${col},${a.toFixed(3)})`);
+    g.addColorStop(0.6, `rgba(${col},${(a * 0.35).toFixed(3)})`);
+    g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.fillRect(0, y0, W, h);
+    ctx.restore();
+  };
+  // główna tafla przybrzeża (między molem a UI): dwa blaski w kontrfazie = przelewający się połysk
+  sheen(0.56, 0.80, 0.22, 0.0, '206,240,255', 0.16);
+  sheen(0.56, 0.80, 0.33, 2.3, '176,222,255', 0.11);
+  // dalekie odbicie zachodu (za molem): wolniejszy, ciepły blask
+  sheen(0.30, 0.43, 0.15, 1.0, '255,226,170', 0.12);
   ctx.restore();
 }
 
