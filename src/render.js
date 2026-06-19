@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b77'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b78'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -1070,13 +1070,12 @@ function renderDescent(ctx, s, hookX, hookY) {
   // nakładały). Sprite flipowany dla lewej strony, by zacisk patrzył na żyłkę.
   const sideItems = gridItems(s.grid, ITEMS).filter(g => ITEMS[g.id] && ITEMS[g.id].mount === 'side');
   sideItems.forEach((it, i) => {
-    const aSize = hookH * 0.95, stepY = hookH * 0.8;
-    const ay = eyeletY - hookH * 0.35 - i * stepY;     // stackowane w górę nad oczkiem
-    const ax = hookX + Math.sin(nowD * 1.6 + i) * 3;   // WYŚRODKOWANE na żyłce (zacisk na linii) + sway
-    const flip = i % 2 === 1;                           // co drugi lustrzany (muzzle naprzemiennie)
+    const aSize = hookH * 0.95, stepY = hookH * 0.95;
+    const ay = eyeletY - hookH * 0.55 - i * stepY;     // stackowane w górę nad oczkiem
+    const ax = hookX + Math.sin(nowD * 1.6 + i) * 3;   // na żyłce + sway
     ctx.save();
     ctx.translate(ax, ay);
-    if (flip) ctx.scale(-1, 1);
+    ctx.rotate(Math.PI / 2);                            // PIONOWO na żyłce (zacisk wzdłuż linii)
     drawItemSpan(ctx, ITEMS[it.id], -aSize / 2, -aSize / 2, aSize, aSize, false);
     ctx.restore();
   });
