@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b71'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b72'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
