@@ -145,7 +145,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b58'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b59'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -999,7 +999,7 @@ function renderDescent(ctx, s, hookX, hookY) {
   if (him) {
     const hw = hookH * (him.naturalWidth || him.width) / (him.naturalHeight || him.height);
     const dx = hookX - hw / 2, dy = hookY - hookH; // ostrze (dół) na hookY, oczko u góry
-    if (hasAnchor && hasBronze && 'filter' in ctx) ctx.filter = 'sepia(0.85) saturate(2.2) brightness(1.05)'; // kotwa → brąz
+    if (hasAnchor && hasBronze && 'filter' in ctx) ctx.filter = 'sepia(1) saturate(1.35) brightness(0.78) contrast(1.05)'; // kotwa → brąz (ciemny, odsycony — nie złoty)
     ctx.drawImage(him, dx, dy, hw, hookH);
     ctx.filter = 'none';
   } else { ctx.fillStyle = '#dfe9f5'; ctx.beginPath(); ctx.arc(hookX, hookY, 8, 0, Math.PI * 2); ctx.fill(); }
