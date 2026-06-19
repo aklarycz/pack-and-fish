@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b74'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b75'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -538,21 +538,26 @@ function renderHome(ctx, s) {
   ctx.textAlign = 'left';
   s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest, stageNodes };
 
-  // overlay otwarcia skrzynki
+  // overlay otwarcia skrzynki — pokazuje IKONĘ otrzymanego itemu + nazwę + opis (gracz musi wiedzieć co dostał)
   if (s.chestReveal) {
-    ctx.fillStyle = 'rgba(3,12,20,0.9)'; ctx.fillRect(0, 0, W, H);
-    ctx.textAlign = 'center'; ctx.fillStyle = '#ffd166'; ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`;
-    ctx.fillText('SKRZYNIA!', cx, H * 0.36);
-    ctx.fillStyle = '#7fe0a0'; ctx.font = `${Math.round(H * 0.032)}px sans-serif`;
-    ctx.fillText('+' + s.chestReveal.sc + ' monet', cx, H * 0.45);
-    if (s.chestReveal.anchor) {
-      ctx.fillStyle = '#9fd0ff';
-      ctx.fillText('Nowe akcesorium: Kotwica', cx, H * 0.52);
-      ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`;
-      ctx.fillText('Włóż ją w plecaku: +1 ryba naraz', cx, H * 0.56);
+    ctx.fillStyle = 'rgba(3,12,20,0.92)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd166'; ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`;
+    ctx.fillText('SKRZYNIA!', cx, H * 0.30);
+    const itemId = s.chestReveal.anchor ? 'anchor' : s.chestReveal.rocket ? 'rocket' : null;
+    const HINT = { anchor: 'Włóż w plecaku: +1 ryba naraz, +1 atk', rocket: 'Włóż w plecaku: strzela 4 dmg co 2 s' };
+    if (itemId && ITEMS[itemId]) {
+      const sz = H * 0.15, w = (ITEMS[itemId].slots || 1) * sz; // ikona z footprintem (rakietnica = 2 sloty)
+      drawItemSpan(ctx, ITEMS[itemId], cx - w / 2, H * 0.355, w, sz, true); // panel rzadkości
+      ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(H * 0.03)}px sans-serif`;
+      ctx.fillText(ITEMS[itemId].name, cx, H * 0.57);
+      ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.021)}px sans-serif`;
+      ctx.fillText(HINT[itemId] || 'Włóż w plecaku', cx, H * 0.61);
     }
+    ctx.fillStyle = '#7fe0a0'; ctx.font = `${Math.round(H * 0.03)}px sans-serif`;
+    ctx.fillText('+' + s.chestReveal.sc + ' monet', cx, H * 0.67);
     ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`;
-    ctx.fillText('Tap, by zamknąć', cx, H * 0.64);
+    ctx.fillText('Tap, by zamknąć', cx, H * 0.73);
     ctx.textAlign = 'left';
   }
 }
