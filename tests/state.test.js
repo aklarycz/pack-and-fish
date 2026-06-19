@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createGame, placeHook, startStage, addDepth, registerStun, registerEscape,
   carouselMove, openBackpack, closeBackpack, stageUnlocked, descentCleared,
-  openChest, placeAccessory, moveItem, computeHookStats, loginGuest,
+  openChest, placeAccessory, moveItem, computeHookStats, loginGuest, returnHome,
 } from '../src/state.js';
 import { STARTER_HOOK, FISH_TYPES, WORLD, STAGES } from '../src/config.js';
 
@@ -155,6 +155,20 @@ test('descentCleared ends the stage as success (cleared) and scores stars', () =
   assert.equal(s.lastResult.cleared, true);
   assert.ok(s.stars >= 1);
   assert.equal(s.progress.stages[1].unlocked, true);
+});
+
+test('returnHome after clear advances to next unlocked stage; after fail it does not', () => {
+  const s = createGame(); startStage(s);
+  s.stunnedPoints = 300; descentCleared(s);          // clear stage 0 (>=1 star -> unlock 1)
+  assert.equal(s.stageIndex, 0);
+  returnHome(s);
+  assert.equal(s.stageIndex, 1);                      // przeskok na kolejny
+  assert.equal(s.mode, 'HOME');
+  // fail nie przeskakuje
+  startStage(s);
+  registerEscape(s); registerEscape(s); registerEscape(s);
+  returnHome(s);
+  assert.equal(s.stageIndex, 1);                      // został na bieżącym
 });
 
 test('zero-star run does not unlock the next stage', () => {

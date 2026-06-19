@@ -107,14 +107,14 @@ export const FISH_TYPES = {
   // speed = pozioma prędkość pływania (px/s). Wyższa niż szybkoscOpadania, żeby
   // ruch w bok DOMINOWAŁ nad scrollem opadania → ryby czytają się jak pływające.
   // coins (waluta do merge) oddzielone od scoreValue (do score).
-  // okna szersze (łapanie z zapasem, nie "na styk"); radius powiększany etapami (większe ryby, ostatnio +15%).
+  // okna szersze (łapanie z zapasem, nie "na styk"); radius powiększany etapami (większe ryby, ostatnio +20%).
   // bass (mała): szybka, UCIEKA od haka; łatwa do złapania (niski hp)
-  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 37, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
+  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 44, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
   // sum (średnia): wolniejszy, UCIEKA; ŁOWIALNY gołym brązem (atk4·okno4.2 = 16.8 dmg) przez cały
   // stage 1 — hp 12 (z 20), na dnie ~×1.28 → 15.3 < 16.8. Z kotwicą/rakietnicą trywialny.
-  sredniak:  { id: 'sredniak',  hp: 12, window: 4.2, speed: 72,  aggroRange: 150, radius: 63, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
+  sredniak:  { id: 'sredniak',  hp: 12, window: 4.2, speed: 72,  aggroRange: 150, radius: 76, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
   // muskie (duża): ATAKUJE hak, NIE DO ZŁAPANIA bazowym sprzętem (8·2.4=19.2 ≪ 40; z kotwicą 9·2.4=21.6 ≪ 40)
-  twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 99, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
+  twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 119, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };
 
 // Rampa wg głębokości (metry). Wartości interpolowane/progowane w ramp.js.

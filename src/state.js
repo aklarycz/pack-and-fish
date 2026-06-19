@@ -103,7 +103,15 @@ export function closeBackpack(s) {
   if (s.hook && s.hook.maxLatch >= 2 && !s.progress.tutAnchorDone) { s.progress.tutAnchorDone = true; dirty = true; }
   if (dirty) saveProgress(s.progress);
 }
-export function returnHome(s) { s.mode = 'HOME'; s.cast = null; s.reveal = null; }
+export function returnHome(s) {
+  // po ZALICZENIU stage'a przeskocz na kolejny odblokowany (gracz od razu gotowy do gry dalej)
+  if (s.lastResult && s.lastResult.cleared) {
+    const next = s.stageIndex + 1;
+    if (next < STAGES.length && stageUnlocked(s, next)) s.stageIndex = next;
+  }
+  s.mode = 'HOME'; s.cast = null; s.reveal = null;
+  s.lastResult = null;
+}
 // splash/login: wejście do gry jako Gość (zamyka overlay startowy)
 export function loginGuest(s) { s.splash = false; }
 
