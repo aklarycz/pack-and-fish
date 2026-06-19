@@ -53,20 +53,29 @@ export const STARTER_HOOK = {
 // Efekt połączenia (maxLatch/+ryba) liczy się TYLKO gdy akcesorium połączone (adjacency) z hakiem.
 // Brązowy hak — startowe akcesorium (z tutoriala): +7 atk (rusty 1 + brąz 7 = 8 → łowi bass/sum).
 export const BRONZE_HOOK = {
-  id: 'bronze', name: 'Brązowy hak', kind: 'accessory', mount: 'hook',
+  id: 'bronze', name: 'Brązowy hak', kind: 'accessory', mount: 'hook', rarity: 'uncommon',
   atk: 7, slots: 1, w: 1, h: 1, desc: '+7 atk (połącz z hakiem)',
 };
 // Kotwica — z 1. skrzyni: +1 jednoczesny zaczep oraz +1 atk.
 export const ANCHOR = {
-  id: 'anchor', name: 'Kotwica', kind: 'accessory', mount: 'hook',
+  id: 'anchor', name: 'Kotwica', kind: 'accessory', mount: 'hook', rarity: 'rare',
   maxLatch: 1, atk: 1, slots: 1, w: 1, h: 1, desc: '+1 ryba naraz, +1 atk (połącz z hakiem)',
 };
 // Wyrzutnia rakiet — z 2. skrzyni: AUTONOMICZNA (działa niezależnie od połączenia). Co `rocketInterval` s
 // namierza najbliższą rybę (zaczepioną lub nie), nakłada mark i zdejmuje `rocketDmg` hp. Zajmuje 2 sloty.
 export const ROCKET = {
-  id: 'rocket', name: 'Wyrzutnia rakiet', kind: 'accessory', mount: 'side',
+  id: 'rocket', name: 'Wyrzutnia rakiet', kind: 'accessory', mount: 'side', rarity: 'epic',
   slots: 2, w: 2, h: 1, rocketDmg: 4, rocketInterval: 2,
   desc: 'Co 2 s: 4 dmg do najbliższej ryby (działa też na zaczepioną). 2 sloty.',
+};
+
+// Rzadkości — kolor tła slotu pod ikoną itemu (sygnał siły). common→epic→legendary.
+export const RARITY = {
+  common:    { name: 'Common',    bg: '#33414f', edge: '#71808f' },
+  uncommon:  { name: 'Uncommon',  bg: '#1d4a2c', edge: '#46c46a' },
+  rare:      { name: 'Rare',      bg: '#1b3a63', edge: '#4f96e6' },
+  epic:      { name: 'Epic',      bg: '#3a2356', edge: '#a96cf0' },
+  legendary: { name: 'Legendary', bg: '#5a3a12', edge: '#f5a623' },
 };
 
 // Rejestr itemów (lookup po id z gridu plecaka).

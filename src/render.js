@@ -1,4 +1,4 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, CAST_ANIM, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
 import { gridItems, itemOrigin } from './logic/backpack.js';
 
@@ -145,7 +145,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b57'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b58'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -722,10 +722,16 @@ function roundedBtn(ctx, r, color, label) {
 const ITEM_FB = { // fallback (zanim ikona się wczyta): kolor + etykieta
   rusty_hook: ['#9aa3ad', 'HAK'], bronze: ['#c87f3a', 'BRĄZ'], anchor: ['#5aa9e0', 'KOTW'], rocket: ['#b85c4a', 'RAKIETA'],
 };
-function drawItemCell(ctx, it, x, y, cell) { drawItemSpan(ctx, it, x, y, cell, cell); }
+function drawItemCell(ctx, it, x, y, cell) { drawItemSpan(ctx, it, x, y, cell, cell, true); }
 // Rysuje item w prostokącie wpx×hpx (item wieloslotowy rozciąga się na swój footprint).
-function drawItemSpan(ctx, it, x, y, wpx, hpx) {
+// bg=true → maluje tło slotu w kolorze rzadkości (sygnał siły); na żyłce bg=false.
+function drawItemSpan(ctx, it, x, y, wpx, hpx, bg) {
   const pad = Math.min(wpx, hpx) * 0.1;
+  if (bg) {
+    const rar = RARITY[it.rarity] || RARITY.common;
+    fillRR(ctx, x + 2, y + 2, wpx - 4, hpx - 4, 8, rar.bg);
+    rrPath(ctx, x + 2, y + 2, wpx - 4, hpx - 4, 8); ctx.strokeStyle = rar.edge; ctx.lineWidth = 2.5; ctx.stroke();
+  }
   const im = keyedEdge(ITEM_SPRITE[it.id]);
   if (im) {
     const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
@@ -733,8 +739,8 @@ function drawItemSpan(ctx, it, x, y, wpx, hpx) {
     ctx.drawImage(im, x + wpx / 2 - w / 2, y + hpx / 2 - h / 2, w, h);
   } else {
     const [col, label] = ITEM_FB[it.id] || ['#9aa3ad', '?'];
-    fillRR(ctx, x + pad, y + pad, wpx - 2 * pad, hpx - 2 * pad, 6, col);
-    ctx.fillStyle = '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(hpx * 0.15)}px sans-serif`;
+    if (!bg) fillRR(ctx, x + pad, y + pad, wpx - 2 * pad, hpx - 2 * pad, 6, col); // bg już maluje tło rzadkości
+    ctx.fillStyle = bg ? '#eaf2ff' : '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(hpx * 0.15)}px sans-serif`;
     ctx.fillText(label, x + wpx / 2, y + hpx / 2 + hpx * 0.06);
   }
 }
@@ -758,7 +764,8 @@ function renderBackpack(ctx, s) {
     if (!ITEMS[id] || idx === dragOrigin) continue;
     const c = idx % BACKPACK.cols, r = Math.floor(idx / BACKPACK.cols);
     const cx = ox + c * bcell, cy = oy + r * bcell, wpx = w * bcell;
-    drawItemSpan(ctx, ITEMS[id], cx, cy, wpx, bcell);
+    drawItemSpan(ctx, ITEMS[id], cx, cy, wpx, bcell, true); // tło rzadkości
+
     if (s.bpSelected && itemOrigin(s.grid, s.bpSelected.gridIdx) === idx) {
       rrPath(ctx, cx, cy, wpx, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke();
     }
