@@ -1,6 +1,6 @@
 // Zapis postępu w localStorage (gwiazdki/best score/odblokowania + hak).
 // Guard na środowisko bez localStorage (testy Node) — wtedy działa na domyślnych.
-const KEY = 'packfish_progress_v9'; // bump = reset progresu (v9 = reset po fixie przegranej)
+const KEY = 'packfish_progress_v10'; // bump = reset progresu (v10 = reset na żądanie)
 
 export function defaultProgress(stageCount) {
   const stages = [];

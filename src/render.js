@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b75'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b76'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -390,7 +390,7 @@ function renderHome(ctx, s) {
   fillRR(ctx, xpX, xpY, xpW, xpH, xpH / 2, 'rgba(14,34,51,0.6)');
   fillRR(ctx, xpX, xpY, xpW * xpFrac, xpH, xpH / 2, '#52d0ff');
   const chW = W * 0.165, chH = H * 0.046, chY = H * 0.046;
-  chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', String(s.progress.coins)); // tylko złoto (reszta wyłączona)
+  chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', formatSC(s.progress.coins)); // tylko złoto; pigułka auto-skaluje
 
   // === Nazwa ARENY (góra) — strzałki przełączają ARENĘ (zmieniają scenę) ===
   const ar = W * 0.05, arCy = H * 0.135;
@@ -696,7 +696,14 @@ function fillRR(ctx, x, y, w, h, r, style) {
   rrPath(ctx, x, y, w, h, r); ctx.fillStyle = style; ctx.fill();
 }
 
-function chip(ctx, rightX, cy, w, h, color, value) {
+// skrót dużych liczb: do 999999 pełna wartość, powyżej "M" (np. 1.2M)
+function formatSC(n) { return n >= 1e6 ? (Math.round(n / 1e5) / 10) + 'M' : String(n); }
+
+// `minW` = minimalna szerokość; pigułka AUTO-rośnie w lewo, by zmieścić liczbę (dziesiątki tysięcy+).
+function chip(ctx, rightX, cy, minW, h, color, value) {
+  ctx.font = `bold ${Math.round(h * 0.42)}px sans-serif`;
+  const textW = ctx.measureText(value).width;
+  const w = Math.max(minW, h * 0.92 + textW + h * 0.64); // ikona+tekst+przycisk(+)
   const x = rightX - w, y = cy - h / 2;
   fillRR(ctx, x, y, w, h, h / 2, 'rgba(14,34,51,0.55)');
   rrPath(ctx, x, y, w, h, h / 2); ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.stroke();
