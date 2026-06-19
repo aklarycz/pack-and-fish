@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b68'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b69'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -198,10 +198,12 @@ function renderSplash(ctx, s) {
   sc.addColorStop(0, 'rgba(4,18,31,0)'); sc.addColorStop(1, 'rgba(4,18,31,0.7)');
   ctx.fillStyle = sc; ctx.fillRect(0, H * 0.55, W, H * 0.45);
   // logo (PNG) lub fallback tekstowy
-  const logo = img(LOGO_SRC);
-  if (ready(logo)) {
-    const lw = W * 0.82, lh = lw * (logo.naturalHeight || 1) / (logo.naturalWidth || 1);
-    ctx.drawImage(logo, W / 2 - lw / 2, H * 0.06, lw, Math.min(lh, H * 0.26));
+  const logo = keyedEdge(LOGO_SRC); // logo ma zapieczone jasne tło → wytnij krawędziowo
+  if (logo) {
+    const ar = (logo.width || 1) / (logo.height || 1); // skala po WYSOKOŚCI (zachowaj proporcje)
+    let lh = H * 0.24, lw = lh * ar;
+    if (lw > W * 0.92) { lw = W * 0.92; lh = lw / ar; }
+    ctx.drawImage(logo, W / 2 - lw / 2, H * 0.02, lw, lh);
   } else {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd24a'; ctx.font = `bold ${Math.round(H * 0.078)}px sans-serif`;
