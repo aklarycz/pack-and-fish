@@ -60,7 +60,7 @@ export function createGame() {
     // pola descentu (resetowane w startStage)
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [], endless: false,
-    rockets: [], rocketCd: 0,   // autonomiczna wyrzutnia: pociski w locie + cooldown do strzału
+    rockets: [], rocketCd: 0, rocketTarget: null, // wyrzutnia: pociski + cooldown + ZABLOKOWANY cel
     lastResult: null,
   };
 }
@@ -196,7 +196,7 @@ export function startStage(s) {
   if (!stageUnlocked(s)) return false;
   s.lives = 3; s.depthPx = 0; s.stunned = 0; s.stunnedPoints = 0; s.coinsEarned = 0; s.score = 0; s.stars = 0;
   s.fish = []; s.latched = []; s.bubbles = []; s.spawnTimer = 0;
-  s.rockets = []; s.rocketCd = s.hook.hasRocket ? s.hook.rocketInterval : 0; // 1. strzał po interwale
+  s.rockets = []; s.rocketTarget = null; s.rocketCd = s.hook.hasRocket ? s.hook.rocketInterval : 0; // 1. strzał po interwale
   const stage = STAGES[s.stageIndex];
   s.stageOffsetM = stage.difficultyOffsetM;
   // spawn MIESZANY (nie falami): każdej rybie losujemy pozycję w sekwencji z okna wg trudności —

@@ -146,7 +146,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b62'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b63'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -894,12 +894,15 @@ function renderDescent(ctx, s, hookX, hookY) {
     } else {
       ctx.fillStyle = t.color; ctx.beginPath(); ctx.arc(f.x, sy, t.radius, 0, Math.PI * 2); ctx.fill();
     }
-    // wskaźnik HP + okno na zaczepionej rybie (KRYTYCZNE do feelu)
-    if (f.state === 'latched') {
+    // wskaźnik HP — na zaczepionej ORAZ na namierzonej przez rakietnicę (widać ubywanie hp).
+    // Pasek okna (żółty) tylko gdy zaczepiona (okno dotyczy łowienia hakiem).
+    if (f.state === 'latched' || f.marked) {
       const w = t.radius * 2;
       ctx.fillStyle = '#000'; ctx.fillRect(f.x - t.radius, sy - t.radius - 14, w, 5);
       ctx.fillStyle = '#ff5d5d'; ctx.fillRect(f.x - t.radius, sy - t.radius - 14, w * Math.max(0, f.hp / f.hpMax), 5);
-      ctx.fillStyle = '#ffd166'; ctx.fillRect(f.x - t.radius, sy - t.radius - 8, w * Math.max(0, f.windowLeft / f.window), 4);
+      if (f.state === 'latched') {
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(f.x - t.radius, sy - t.radius - 8, w * Math.max(0, f.windowLeft / f.window), 4);
+      }
     }
     // mark celownika rakietnicy — czerwony narożnikowy reticle (cel namierzony przez wyrzutnię)
     if (f.marked) {

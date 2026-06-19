@@ -53,6 +53,24 @@ test('autonomous rocket marks nearest fish and damages it regardless of latch', 
   assert.equal(s.stunned >= 1, true);
 });
 
+test('rocket locks nearest target and keeps the mark (does not switch)', () => {
+  const s = started();
+  s.progress.inventory.rocket = 1; placeAccessory(s, 'rocket'); startStage(s);
+  s.fishQueue = [];
+  const hookX = 200, hwy = s.depthPx + HOOK_Y;
+  const near = { type: 'plotka', x: hookX + 20, y: hwy, hp: 12, hpMax: 12, window: 3, windowLeft: 3, state: 'patrol', dir: 1, bubbleY: 0 };
+  const far = { type: 'plotka', x: hookX + 240, y: hwy, hp: 12, hpMax: 12, window: 3, windowLeft: 3, state: 'patrol', dir: 1, bubbleY: 0 };
+  s.fish.push(near, far);
+  s.rocketCd = 1;
+  stepDescent(s, hookX, HOOK_Y, 0.05, () => 0.5);
+  assert.equal(s.rocketTarget, near);    // zablokował najbliższą
+  assert.equal(near.marked, true);
+  assert.equal(!!far.marked, false);     // druga ryba nietknięta
+  // kolejne kroki nie przełączają celu na drugą rybę
+  for (let i = 0; i < 5; i++) stepDescent(s, hookX, HOOK_Y, 0.05, () => 0.5);
+  if (s.fish.includes(near)) assert.equal(s.rocketTarget, near);
+});
+
 test('descent runs many steps without throwing and accrues depth', () => {
   const s = started();
   for (let i = 0; i < 400; i++) {

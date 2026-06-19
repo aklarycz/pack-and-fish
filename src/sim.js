@@ -94,22 +94,28 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     }
   }
 
-  // === AUTONOMICZNA WYRZUTNIA RAKIET === co rocketInterval namierza NAJBLIŻSZĄ rybę
-  // (zaczepioną lub nie) i zdejmuje rocketDmg hp — z tej samej puli co ręczne ogłuszanie.
+  // === AUTONOMICZNA WYRZUTNIA RAKIET === BLOKUJE cel (mark trzyma się tej samej ryby) i wali
+  // w nią co rocketInterval AŻ ją wykończy. Dopiero gdy cel zginie/ucieknie -> namierza nowy (najbliższy).
   if (s.hook.hasRocket) {
-    s.rocketCd -= dt;
-    if (s.rocketCd <= 0) {
+    let tgt = s.rocketTarget;
+    // zwolnij cel jeśli zniknął / ogłuszony / uciekł
+    if (tgt && (s.fish.indexOf(tgt) < 0 || tgt.state === 'stunned' || tgt.state === 'escaped')) {
+      tgt.marked = false; tgt = s.rocketTarget = null;
+    }
+    // brak celu -> namierz najbliższą rybę i ZABLOKUJ
+    if (!tgt) {
       let best = null, bestD = Infinity;
       for (const f of s.fish) {
         if (f.state === 'stunned' || f.state === 'escaped') continue;
         const d = Math.hypot(f.x - hookX, f.y - hookWorldY);
         if (d < bestD) { bestD = d; best = f; }
       }
-      if (best) {
-        best.marked = true;
-        s.rockets.push({ target: best, x: hookX, y: hookWorldY, t: 0 });
-        s.rocketCd = s.hook.rocketInterval;
-      } else { s.rocketCd = 0.3; } // brak celu — spróbuj wkrótce
+      if (best) { best.marked = true; s.rocketTarget = best; tgt = best; }
+    }
+    // strzelaj w utrzymany cel
+    if (tgt) {
+      s.rocketCd -= dt;
+      if (s.rocketCd <= 0) { s.rockets.push({ target: tgt, x: hookX, y: hookWorldY, t: 0 }); s.rocketCd = s.hook.rocketInterval; }
     }
   }
   const ROCKET_FLIGHT = 0.32; // s lotu pocisku zanim zada dmg
@@ -119,14 +125,14 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     if (rk.t < ROCKET_FLIGHT) continue;
     const f = rk.target;
     s.rockets.splice(ri, 1);
-    if (!f || s.fish.indexOf(f) < 0 || f.state === 'stunned' || f.state === 'escaped') { if (f) f.marked = false; continue; }
-    f.hp -= s.hook.rocketDmg;
-    f.marked = false;
-    if (f.hp <= 0) {                       // rakieta dobiła rybę -> ogłuszenie + bańka + score
+    if (!f || s.fish.indexOf(f) < 0 || f.state === 'stunned' || f.state === 'escaped') continue;
+    f.hp -= s.hook.rocketDmg;             // mark NIE znika — cel pozostaje zablokowany
+    if (f.hp <= 0) {                      // rakieta dobiła rybę -> ogłuszenie + bańka + score
       registerStun(s, FISH_TYPES[f.type]);
       f.bubbleY = f.y; s.bubbles.push(f);
       removeFish(s, f);
       const li = s.latched.indexOf(f); if (li >= 0) s.latched.splice(li, 1);
+      if (s.rocketTarget === f) { f.marked = false; s.rocketTarget = null; } // zwolnij cel po zabiciu
     }
   }
 
