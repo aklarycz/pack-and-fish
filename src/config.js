@@ -102,6 +102,9 @@ export const TEST_ENDLESS_DESCENT = false;
 // hak można prowadzić po całym ekranie. Ustaw false, by wrócić do normalnego pasma ruchu.
 export const TEST_FREE_HOOK = true;
 
+// Czas lotu pocisku rakietnicy (s) — większy = wolniejszy pocisk. (2× wolniej: 0.32 → 0.64)
+export const ROCKET_FLIGHT = 0.64;
+
 // 3 archetypy: jedna oś = HP vs okno. scoreValue liczy się przy ogłuszeniu.
 export const FISH_TYPES = {
   // speed = pozioma prędkość pływania (px/s). Wyższa niż szybkoscOpadania, żeby

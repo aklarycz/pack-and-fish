@@ -1,4 +1,4 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf, tackleboxOf } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ROCKET_FLIGHT, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf, tackleboxOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
 import { gridItems, itemOrigin } from './logic/backpack.js';
 
@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b78'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b79'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -1012,7 +1012,7 @@ function renderDescent(ctx, s, hookX, hookY) {
   const shotIm = keyedEdge(ROCKET_SHOT_SRC);
   for (const rk of s.rockets || []) {
     const f = rk.target; if (!f) continue;
-    const p = Math.min(1, rk.t / 0.32);
+    const p = Math.min(1, rk.t / ROCKET_FLIGHT);
     const x0 = rk.x, y0 = rk.y - camY, x1 = f.x, y1 = f.y - camY;
     const px = x0 + (x1 - x0) * p, py = y0 + (y1 - y0) * p;
     const a = Math.atan2(y1 - y0, x1 - x0); // sprite dziobem w prawo (0 rad) → rotacja = kąt lotu
@@ -1070,12 +1070,14 @@ function renderDescent(ctx, s, hookX, hookY) {
   // nakładały). Sprite flipowany dla lewej strony, by zacisk patrzył na żyłkę.
   const sideItems = gridItems(s.grid, ITEMS).filter(g => ITEMS[g.id] && ITEMS[g.id].mount === 'side');
   sideItems.forEach((it, i) => {
-    const aSize = hookH * 0.95, stepY = hookH * 0.95;
+    const aSize = hookH * 0.92, stepY = hookH * 0.95;
     const ay = eyeletY - hookH * 0.55 - i * stepY;     // stackowane w górę nad oczkiem
-    const ax = hookX + Math.sin(nowD * 1.6 + i) * 3;   // na żyłce + sway
+    const sway = Math.sin(nowD * 1.6 + i) * 3;
+    // obrót o 90° (dziób w dół, ku rybom) + przesunięcie tak, by ZACISK (po obrocie z lewej)
+    // siadł dokładnie na żyłce (hookX), a korpus wystawał w bok.
     ctx.save();
-    ctx.translate(ax, ay);
-    ctx.rotate(Math.PI / 2);                            // PIONOWO na żyłce (zacisk wzdłuż linii)
+    ctx.translate(hookX + sway + aSize * 0.30, ay);
+    ctx.rotate(Math.PI / 2);
     drawItemSpan(ctx, ITEMS[it.id], -aSize / 2, -aSize / 2, aSize, aSize, false);
     ctx.restore();
   });

@@ -1,5 +1,5 @@
 // Czysta symulacja jednej klatki descentu (bez DOM). main.js woła to w pętli rAF.
-import { WORLD, FISH_TYPES, STAGES } from './config.js';
+import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT } from './config.js';
 import { difficultyAt } from './logic/ramp.js';
 import { createFish } from './logic/spawn.js';
 import { startLatch, tickLatch } from './logic/combat.js';
@@ -118,7 +118,7 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
       if (s.rocketCd <= 0) { s.rockets.push({ target: tgt, x: hookX, y: hookWorldY, t: 0 }); s.rocketCd = s.hook.rocketInterval; }
     }
   }
-  const ROCKET_FLIGHT = 0.32; // s lotu pocisku zanim zada dmg
+  // ROCKET_FLIGHT (config): czas lotu pocisku zanim zada dmg
   for (let ri = s.rockets.length - 1; ri >= 0; ri--) {
     const rk = s.rockets[ri];
     rk.t += dt;
