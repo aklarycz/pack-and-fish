@@ -78,20 +78,23 @@ export const CAST_ANIM = 1.2; // ile z tego trwa sama animacja zarzutu (reszta =
 // ryby dolewają się wg głębokości, descentCleared nie odpala. Pozwala testować dowolną
 // głębokość (przyciemnianie, wizual). Ustaw false, by wrócić do skończonych stage'y.
 export const TEST_ENDLESS_DESCENT = true;
+// TRYB TESTOWY: zdejmuje granicę sterowania hakiem (pasmo hookMinX/Max, hookMinY/Max) —
+// hak można prowadzić po całym ekranie. Ustaw false, by wrócić do normalnego pasma ruchu.
+export const TEST_FREE_HOOK = true;
 
 // 3 archetypy: jedna oś = HP vs okno. scoreValue liczy się przy ogłuszeniu.
 export const FISH_TYPES = {
   // speed = pozioma prędkość pływania (px/s). Wyższa niż szybkoscOpadania, żeby
   // ruch w bok DOMINOWAŁ nad scrollem opadania → ryby czytają się jak pływające.
   // coins (waluta do merge) oddzielone od scoreValue (do score).
-  // okna szersze (łapanie z zapasem, nie "na styk"); radius +30% (większe ryby).
+  // okna szersze (łapanie z zapasem, nie "na styk"); radius powiększany etapami (większe ryby, ostatnio +15%).
   // bass (mała): szybka, UCIEKA od haka; łatwa do złapania (niski hp)
-  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 32, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
+  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 37, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
   // sum (średnia): wolniejszy, UCIEKA; hp tak dobrane, by bazowy hak (atk8) ledwie zdążył (na styk):
   // 8·3.4=27.2 dmg; przy głębi stage'a hp rośnie ~×1.36 → 20·1.36≈27 = na styk
-  sredniak:  { id: 'sredniak',  hp: 20, window: 3.4, speed: 72,  aggroRange: 150, radius: 55, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
+  sredniak:  { id: 'sredniak',  hp: 20, window: 3.4, speed: 72,  aggroRange: 150, radius: 63, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
   // muskie (duża): ATAKUJE hak, NIE DO ZŁAPANIA bazowym sprzętem (8·2.4=19.2 ≪ 40; z kotwicą 9·2.4=21.6 ≪ 40)
-  twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 86, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
+  twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 99, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };
 
 // Rampa wg głębokości (metry). Wartości interpolowane/progowane w ramp.js.

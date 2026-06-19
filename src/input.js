@@ -1,5 +1,5 @@
 // Tłumaczy pointer events na intencje. Czyste pozycjonowanie; logika w state/main.
-import { WORLD } from './config.js';
+import { WORLD, TEST_FREE_HOOK } from './config.js';
 
 export function attachInput(canvas, handlers) {
   // handlers: { onPointerDown(x,y), onPointerMove(x,y), onPointerUp(x,y) }
@@ -22,9 +22,11 @@ export function attachInput(canvas, handlers) {
 }
 
 export function clampHookX(x) {
+  if (TEST_FREE_HOOK) return Math.max(0, Math.min(WORLD.W, x));
   return Math.max(WORLD.hookMinX, Math.min(WORLD.hookMaxX, x));
 }
 
 export function clampHookY(y) {
+  if (TEST_FREE_HOOK) return Math.max(0, Math.min(WORLD.H, y));
   return Math.max(WORLD.hookMinY, Math.min(WORLD.hookMaxY, y));
 }
