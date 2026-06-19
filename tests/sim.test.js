@@ -38,6 +38,21 @@ test('three tough fish that escape end the descent at END', () => {
   assert.equal(typeof s.stars, 'number');
 });
 
+test('autonomous rocket marks nearest fish and damages it regardless of latch', () => {
+  const s = started();
+  s.progress.inventory.rocket = 1; placeAccessory(s, 'rocket');
+  startStage(s);                                  // przelicza hook + init rocketCd
+  s.fishQueue = [];                               // bez nowych spawnów
+  const hookX = 200, hookWorldY = s.depthPx + HOOK_Y;
+  const f = { type: 'twardziel', x: hookX + 20, y: hookWorldY, hp: 6, hpMax: 60, window: 2, windowLeft: 2, state: 'patrol', dir: 1, bubbleY: 0 };
+  s.fish.push(f);
+  s.rocketCd = 0;                                 // wystrzel od razu
+  let safety = 0, hpStart = f.hp;
+  while (s.fish.includes(f) && safety++ < 200) stepDescent(s, hookX, HOOK_Y, 0.05, () => 0.5);
+  // rakieta (4 dmg) dobiła rybę (hp6) -> ogłuszenie, nawet bez zaczepienia na haku
+  assert.equal(s.stunned >= 1, true);
+});
+
 test('descent runs many steps without throwing and accrues depth', () => {
   const s = started();
   for (let i = 0; i < 400; i++) {

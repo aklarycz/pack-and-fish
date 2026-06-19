@@ -101,6 +101,38 @@ test('raw atk always counts; +fish (maxLatch) only when anchor connected to bron
   assert.equal(s.hook.atk, STARTER_HOOK.atk + 7 + 1); // atk bez zmian (raw)
 });
 
+test('rocket takes 2 grid slots and sets rocket stats (autonomous)', () => {
+  const s = createGame();
+  s.progress.inventory.rocket = 1;
+  assert.equal(placeAccessory(s, 'rocket'), true);
+  // zajmuje 2 sąsiednie komórki tym samym id
+  assert.equal(s.grid.cells[0], 'rocket');
+  assert.equal(s.grid.cells[1], 'rocket');
+  assert.equal(s.hook.hasRocket, true);
+  assert.equal(s.hook.rocketDmg, 4);
+  assert.equal(s.hook.rocketInterval, 2);
+  assert.equal(s.hook.atk, STARTER_HOOK.atk); // rakieta nie dodaje raw atk
+});
+
+test('second chest forces the rocket (after anchor)', () => {
+  const s = createGame(); placeHook(s, 0, 0); startStage(s);
+  s.stunnedPoints = 300; descentCleared(s);
+  assert.equal(openChest(s).anchor, true);          // 1. skrzynia = kotwica
+  s.progress.pendingChests = 1;                      // wymuś 2. skrzynię
+  const reward = openChest(s);
+  assert.equal(reward.rocket, true);
+  assert.equal(s.progress.inventory.rocket, 1);
+  assert.equal(s.progress.gotRocket, true);
+});
+
+test('multi-slot item does not double-count stats', () => {
+  const s = createGame();
+  s.grid.cells[0] = 'rocket'; s.grid.cells[1] = 'rocket'; // 2 komórki = 1 item
+  s.hook = computeHookStats(s.grid);
+  assert.equal(s.hook.atk, STARTER_HOOK.atk);        // raz, nie 2×
+  assert.equal(s.hook.hasRocket, true);
+});
+
 test('fish award coins from their coins field', () => {
   const s = createGame(); placeHook(s, 0, 0); startStage(s);
   registerStun(s, FISH_TYPES.twardziel);

@@ -1,5 +1,5 @@
 import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
-import { createGrid, placeItem } from './logic/backpack.js';
+import { createGrid, placeItem, findFreeRun, itemOrigin, gridItems } from './logic/backpack.js';
 import { computeScore, computeStars } from './logic/scoring.js';
 import { loadProgress, saveProgress } from './persistence.js';
 
@@ -12,14 +12,16 @@ export function computeHookStats(grid) {
   const { cells, cols, rows } = grid;
   let atk = STARTER_HOOK.atk, maxLatch = STARTER_HOOK.maxLatch;
   let bronzeIdx = -1, hasBronze = false, hasAnchor = false;
-  for (let i = 0; i < cells.length; i++) {
-    const it = cells[i] && ITEMS[cells[i]];
+  let hasRocket = false, rocketDmg = 0, rocketInterval = 0;
+  for (const { id, idx } of gridItems(grid, ITEMS)) {   // każdy item RAZ (nie per-komórka)
+    const it = ITEMS[id];
     if (!it || it.kind !== 'accessory') continue;
     atk += it.atk || 0;                    // raw atk — zawsze
-    if (it.id === 'bronze') { bronzeIdx = i; hasBronze = true; }
+    if (it.id === 'bronze') { bronzeIdx = idx; hasBronze = true; }
     if (it.id === 'anchor') hasAnchor = true;
+    if (it.id === 'rocket') { hasRocket = true; rocketDmg = it.rocketDmg || 0; rocketInterval = it.rocketInterval || 0; }
   }
-  if (bronzeIdx >= 0) { // komponent spójny zawierający brązowy hak → te akcesoria dają bonus latch
+  if (bronzeIdx >= 0) { // komponent spójny (per-komórka) zawierający brązowy hak → bonus latch
     const seen = new Set([bronzeIdx]), stack = [bronzeIdx];
     while (stack.length) {
       const idx = stack.pop(), r = Math.floor(idx / cols), c = idx % cols, nb = [];
@@ -27,9 +29,16 @@ export function computeHookStats(grid) {
       if (c > 0) nb.push(idx - 1); if (c < cols - 1) nb.push(idx + 1);
       for (const n of nb) { const it = cells[n] && ITEMS[cells[n]]; if (it && it.kind === 'accessory' && !seen.has(n)) { seen.add(n); stack.push(n); } }
     }
-    for (const idx of seen) { const it = ITEMS[cells[idx]]; if (it) maxLatch += it.maxLatch || 0; }
+    const counted = new Set();             // maxLatch liczymy RAZ na item (po origin), nie per-komórka
+    for (const i of seen) {
+      const o = itemOrigin(grid, i);
+      if (o < 0 || counted.has(o)) continue;
+      counted.add(o);
+      const it = ITEMS[cells[o]];
+      if (it) maxLatch += it.maxLatch || 0;
+    }
   }
-  return { atk, maxLatch, zwrotnosc: STARTER_HOOK.zwrotnosc, szybkoscOpadania: STARTER_HOOK.szybkoscOpadania, hasBronze, hasAnchor };
+  return { atk, maxLatch, zwrotnosc: STARTER_HOOK.zwrotnosc, szybkoscOpadania: STARTER_HOOK.szybkoscOpadania, hasBronze, hasAnchor, hasRocket, rocketDmg, rocketInterval };
 }
 
 export function createGame() {
@@ -51,6 +60,7 @@ export function createGame() {
     // pola descentu (resetowane w startStage)
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [], endless: false,
+    rockets: [], rocketCd: 0,   // autonomiczna wyrzutnia: pociski w locie + cooldown do strzału
     lastResult: null,
   };
 }
@@ -102,12 +112,13 @@ export function placeHook(s, col, row) {
   return true;
 }
 
-// Wkłada akcesorium z ekwipunku w pierwsze wolne pole (placement aktywuje efekt).
+// Wkłada akcesorium z ekwipunku w pierwszy wolny CIĄG `slots` komórek (placement aktywuje efekt).
 export function placeAccessory(s, itemId) {
   if (!s.progress.inventory[itemId]) return false;
-  const idx = s.grid.cells.indexOf(null);
-  if (idx < 0) return false;
-  s.grid.cells[idx] = itemId;
+  const w = (ITEMS[itemId] && ITEMS[itemId].slots) || 1;
+  const idx = findFreeRun(s.grid, w);
+  if (idx < 0) return false;                       // brak miejsca na item tej szerokości
+  for (let k = 0; k < w; k++) s.grid.cells[idx + k] = itemId;
   s.progress.inventory[itemId] -= 1;
   if (s.progress.inventory[itemId] <= 0) delete s.progress.inventory[itemId];
   s.hook = computeHookStats(s.grid);
@@ -123,12 +134,14 @@ export function selectPlaced(s, gridIdx) {
   const id = s.grid.cells[gridIdx];
   if (id && ITEMS[id] && ITEMS[id].kind !== 'hook') s.bpSelected = { id, gridIdx }; // bazowego haka nie zaznaczamy
 }
-// wypnij akcesorium z gridu z powrotem do ekwipunku (haka nie wypinamy)
+// wypnij akcesorium z gridu z powrotem do ekwipunku (haka nie wypinamy) — czyści cały footprint
 export function unequipAccessory(s, gridIdx) {
-  const id = s.grid.cells[gridIdx];
-  const it = id && ITEMS[id];
+  const o = itemOrigin(s.grid, gridIdx);
+  if (o < 0) return false;
+  const id = s.grid.cells[o], it = ITEMS[id];
   if (!it || it.kind === 'hook') return false;
-  s.grid.cells[gridIdx] = null;
+  const w = it.slots || 1;
+  for (let k = 0; k < w; k++) s.grid.cells[o + k] = null;
   s.progress.inventory[id] = (s.progress.inventory[id] || 0) + 1;
   s.hook = computeHookStats(s.grid);
   s.bpSelected = null;
@@ -136,14 +149,20 @@ export function unequipAccessory(s, gridIdx) {
   return true;
 }
 
-// Swobodne przesuwanie w gridzie: przenieś (na puste) lub zamień (swap).
+// Przeniesienie itemu (z całym footprintem) na docelowy CIĄG komórek; anuluje gdy zajęte.
 export function moveItem(s, fromIdx, toIdx) {
-  const cells = s.grid.cells;
-  if (fromIdx === toIdx || !cells[fromIdx]) return false;
-  if (toIdx < 0 || toIdx >= cells.length) return false;
-  const tmp = cells[toIdx];
-  cells[toIdx] = cells[fromIdx];
-  cells[fromIdx] = tmp;
+  const cells = s.grid.cells, cols = s.grid.cols;
+  const o = itemOrigin(s.grid, fromIdx);
+  if (o < 0 || toIdx < 0 || toIdx >= cells.length) return false;
+  const id = cells[o], w = (ITEMS[id] && ITEMS[id].slots) || 1;
+  const tr = Math.floor(toIdx / cols);
+  let tc = toIdx % cols; if (tc + w > cols) tc = cols - w;   // clamp do szerokości wiersza
+  const dest = tr * cols + tc;
+  if (dest === o) return false;
+  const self = new Set(); for (let k = 0; k < w; k++) self.add(o + k);
+  for (let k = 0; k < w; k++) { const d = dest + k; if (cells[d] !== null && !self.has(d)) return false; }
+  for (let k = 0; k < w; k++) cells[o + k] = null;
+  for (let k = 0; k < w; k++) cells[dest + k] = id;
   s.hook = computeHookStats(s.grid);
   persist(s);
   return true;
@@ -153,12 +172,16 @@ export function moveItem(s, fromIdx, toIdx) {
 export function openChest(s) {
   if (s.progress.pendingChests <= 0) return null;
   s.progress.pendingChests -= 1;
-  const reward = { sc: CHEST_SC, anchor: false };
+  const reward = { sc: CHEST_SC, anchor: false, rocket: false };
   s.progress.coins += CHEST_SC;
-  if (!s.progress.gotAnchor) {           // pierwsza skrzynka WYMUSZA Kotwicę
+  if (!s.progress.gotAnchor) {           // 1. skrzynka WYMUSZA Kotwicę
     s.progress.inventory.anchor = (s.progress.inventory.anchor || 0) + 1;
     s.progress.gotAnchor = true;
     reward.anchor = true;
+  } else if (!s.progress.gotRocket) {    // 2. skrzynka WYMUSZA Wyrzutnię rakiet
+    s.progress.inventory.rocket = (s.progress.inventory.rocket || 0) + 1;
+    s.progress.gotRocket = true;
+    reward.rocket = true;
   }
   saveProgress(s.progress);
   s.chestReveal = reward;
@@ -173,6 +196,7 @@ export function startStage(s) {
   if (!stageUnlocked(s)) return false;
   s.lives = 3; s.depthPx = 0; s.stunned = 0; s.stunnedPoints = 0; s.coinsEarned = 0; s.score = 0; s.stars = 0;
   s.fish = []; s.latched = []; s.bubbles = []; s.spawnTimer = 0;
+  s.rockets = []; s.rocketCd = s.hook.hasRocket ? s.hook.rocketInterval : 0; // 1. strzał po interwale
   const stage = STAGES[s.stageIndex];
   s.stageOffsetM = stage.difficultyOffsetM;
   // spawn MIESZANY (nie falami): każdej rybie losujemy pozycję w sekwencji z okna wg trudności —

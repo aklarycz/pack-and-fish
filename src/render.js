@@ -1,5 +1,6 @@
 import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, CAST_DUR, CAST_ANIM, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
+import { gridItems, itemOrigin } from './logic/backpack.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
 const ASSET_VER = 'b46'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
@@ -83,7 +84,7 @@ const FISH_SPRITE = {
 };
 const BUBBLE_SRC = 'assets/bubble.png';
 // itemy (hak/akcesoria) — ikony plecaka + nakładki na hak w minigrze
-const ITEM_SPRITE = { rusty_hook: 'assets/items/hook.png', bronze: 'assets/items/bronze.png', anchor: 'assets/items/anchor.png' };
+const ITEM_SPRITE = { rusty_hook: 'assets/items/hook.png', bronze: 'assets/items/bronze.png', anchor: 'assets/items/anchor.png', rocket: 'assets/items/rocket.png' };
 const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla (Home) + fallback kurtyny
 const CURTAIN = 'assets/arenas/arena-01-curtain.png'; // dedykowana kurtyna przejścia (pełna wysokość, alfa)
 const REVEAL_HOLD = 0.3;  // ile kurtyna trzyma ZAKRYTE po wejściu pod wodę ("loading")
@@ -144,7 +145,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b56'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b57'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -718,19 +719,23 @@ function roundedBtn(ctx, r, color, label) {
   ctx.textAlign = 'left';
 }
 
-function drawItemCell(ctx, it, x, y, cell) {
-  const pad = cell * 0.1;
+const ITEM_FB = { // fallback (zanim ikona się wczyta): kolor + etykieta
+  rusty_hook: ['#9aa3ad', 'HAK'], bronze: ['#c87f3a', 'BRĄZ'], anchor: ['#5aa9e0', 'KOTW'], rocket: ['#b85c4a', 'RAKIETA'],
+};
+function drawItemCell(ctx, it, x, y, cell) { drawItemSpan(ctx, it, x, y, cell, cell); }
+// Rysuje item w prostokącie wpx×hpx (item wieloslotowy rozciąga się na swój footprint).
+function drawItemSpan(ctx, it, x, y, wpx, hpx) {
+  const pad = Math.min(wpx, hpx) * 0.1;
   const im = keyedEdge(ITEM_SPRITE[it.id]);
   if (im) {
     const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
-    const box = cell - 2 * pad, sc = Math.min(box / iw, box / ih), w = iw * sc, h = ih * sc;
-    ctx.drawImage(im, x + cell / 2 - w / 2, y + cell / 2 - h / 2, w, h);
-  } else { // fallback: kolorowy kafel + etykieta (zanim ikona się wczyta)
-    const col = it.kind === 'hook' ? '#9aa3ad' : it.id === 'bronze' ? '#c87f3a' : '#5aa9e0';
-    const label = it.kind === 'hook' ? 'HAK' : it.id === 'bronze' ? 'BRĄZ' : 'KOTW';
-    fillRR(ctx, x + pad, y + pad, cell - 2 * pad, cell - 2 * pad, 6, col);
-    ctx.fillStyle = '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(cell * 0.15)}px sans-serif`;
-    ctx.fillText(label, x + cell / 2, y + cell / 2 + cell * 0.06);
+    const bw = wpx - 2 * pad, bh = hpx - 2 * pad, sc = Math.min(bw / iw, bh / ih), w = iw * sc, h = ih * sc;
+    ctx.drawImage(im, x + wpx / 2 - w / 2, y + hpx / 2 - h / 2, w, h);
+  } else {
+    const [col, label] = ITEM_FB[it.id] || ['#9aa3ad', '?'];
+    fillRR(ctx, x + pad, y + pad, wpx - 2 * pad, hpx - 2 * pad, 6, col);
+    ctx.fillStyle = '#06121f'; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(hpx * 0.15)}px sans-serif`;
+    ctx.fillText(label, x + wpx / 2, y + hpx / 2 + hpx * 0.06);
   }
 }
 
@@ -743,14 +748,19 @@ function renderBackpack(ctx, s) {
   const bcell = Math.round(Math.min(W * 0.22, H * 0.105)); // responsywne pole (mieści się na telefonie)
   const gw = BACKPACK.cols * bcell, gh = BACKPACK.rows * bcell;
   const ox = (W - gw) / 2, oy = H * 0.11;
+  // 1) ramki wszystkich komórek
   for (let r = 0; r < BACKPACK.rows; r++) for (let c = 0; c < BACKPACK.cols; c++) {
-    const cellX = ox + c * bcell, cellY = oy + r * bcell;
-    ctx.strokeStyle = '#2c5a82'; ctx.lineWidth = 2; ctx.strokeRect(cellX, cellY, bcell, bcell);
-    const idx = r * BACKPACK.cols + c;
-    const id = s.grid.cells[idx];
-    if (id && ITEMS[id] && !(s.bpDrag && s.bpDrag.fromIdx === idx)) {
-      drawItemCell(ctx, ITEMS[id], cellX, cellY, bcell); // grid trzyma tylko akcesoria
-      if (s.bpSelected && s.bpSelected.gridIdx === idx) { rrPath(ctx, cellX, cellY, bcell, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke(); }
+    ctx.strokeStyle = '#2c5a82'; ctx.lineWidth = 2; ctx.strokeRect(ox + c * bcell, oy + r * bcell, bcell, bcell);
+  }
+  // 2) itemy — każdy RAZ, rozciągnięty na swój footprint (slots×1). Pomijamy aktualnie przeciągany.
+  const dragOrigin = s.bpDrag ? itemOrigin(s.grid, s.bpDrag.fromIdx) : -1;
+  for (const { id, idx, w } of gridItems(s.grid, ITEMS)) {
+    if (!ITEMS[id] || idx === dragOrigin) continue;
+    const c = idx % BACKPACK.cols, r = Math.floor(idx / BACKPACK.cols);
+    const cx = ox + c * bcell, cy = oy + r * bcell, wpx = w * bcell;
+    drawItemSpan(ctx, ITEMS[id], cx, cy, wpx, bcell);
+    if (s.bpSelected && itemOrigin(s.grid, s.bpSelected.gridIdx) === idx) {
+      rrPath(ctx, cx, cy, wpx, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke();
     }
   }
   s._grid = { ox, oy, cell: bcell };
@@ -882,6 +892,32 @@ function renderDescent(ctx, s, hookX, hookY) {
       ctx.fillStyle = '#ff5d5d'; ctx.fillRect(f.x - t.radius, sy - t.radius - 14, w * Math.max(0, f.hp / f.hpMax), 5);
       ctx.fillStyle = '#ffd166'; ctx.fillRect(f.x - t.radius, sy - t.radius - 8, w * Math.max(0, f.windowLeft / f.window), 4);
     }
+    // mark celownika rakietnicy — czerwony narożnikowy reticle (cel namierzony przez wyrzutnię)
+    if (f.marked) {
+      const rr = t.radius + 6, k = rr * 0.5, sp = nowD * 2.5;
+      ctx.save(); ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 2.5;
+      ctx.translate(f.x, sy); ctx.rotate(sp * 0.0); // narożniki
+      for (const [sxn, syn] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        ctx.beginPath();
+        ctx.moveTo(sxn * rr, syn * rr - syn * k); ctx.lineTo(sxn * rr, syn * rr); ctx.lineTo(sxn * rr - sxn * k, syn * rr);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  // pociski rakiet — smuga + świecąca główka lecące od haka do celu
+  for (const rk of s.rockets || []) {
+    const f = rk.target; if (!f) continue;
+    const p = Math.min(1, rk.t / 0.32);
+    const x0 = rk.x, y0 = rk.y - camY, x1 = f.x, y1 = f.y - camY;
+    const px = x0 + (x1 - x0) * p, py = y0 + (y1 - y0) * p;
+    const a = Math.atan2(y1 - y0, x1 - x0);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,200,120,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(px - Math.cos(a) * 18, py - Math.sin(a) * 18); ctx.lineTo(px, py); ctx.stroke();
+    ctx.fillStyle = '#fff2c8'; ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,150,60,0.9)'; ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
   // bańki z ogłuszonymi (sprite ryby + bańka)
   for (const b of s.bubbles || []) {
@@ -921,6 +957,34 @@ function renderDescent(ctx, s, hookX, hookY) {
     hookX - drag * 1.9 + sway * 0.6, eyeletY * 0.72,
     hookX, eyeletY);                               // żyłka kończy się na OCZKU haka
   ctx.stroke(); ctx.lineCap = 'butt';
+
+  // === CIĘŻARKI + boczne attachementy (auto-wizual) === żeby gadżety nie wisiały w powietrzu:
+  // każde 2 attachementy (mount:'side') = 1 ciężarek na żyłce; attachement L wypełnia się przed P.
+  const sideItems = gridItems(s.grid, ITEMS).filter(g => ITEMS[g.id] && ITEMS[g.id].mount === 'side');
+  if (sideItems.length) {
+    const wGap = hookH * 0.52, armLen = hookH * 0.5, aSize = hookH * 0.5;
+    const nW = Math.ceil(sideItems.length / 2);
+    for (let j = 0; j < nW; j++) {
+      const wy = eyeletY - (j + 1) * wGap;
+      const wx = hookX + Math.sin(nowD * 1.6 + j) * 4; // sway spójny z żyłką
+      // ramiona do założonych attachementów tego ciężarka (0=lewo, 1=prawo)
+      for (let side = 0; side < 2; side++) {
+        const it = sideItems[j * 2 + side]; if (!it) continue;
+        const ax = wx + (side ? armLen : -armLen);
+        ctx.strokeStyle = '#3a4654'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(ax, wy); ctx.stroke();
+        drawItemSpan(ctx, ITEMS[it.id], ax - aSize / 2, wy - aSize / 2, aSize, aSize);
+      }
+      // klamra-ciężarek na żyłce
+      ctx.save();
+      ctx.fillStyle = '#46535f'; ctx.strokeStyle = '#1b242e'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(wx, wy, hookH * 0.11, hookH * 0.16, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(200,222,244,0.35)';
+      ctx.beginPath(); ctx.ellipse(wx - hookH * 0.035, wy - hookH * 0.05, hookH * 0.035, hookH * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
   // JEDEN widoczny hak wg tego co założone: kotwiczka > brąz > rusty (baza). Z kotwą+brązem → kotwa na brąz.
   const hasBronze = s.hook && s.hook.hasBronze, hasAnchor = s.hook && s.hook.hasAnchor;
   const hookSrc = hasAnchor ? ITEM_SPRITE.anchor : hasBronze ? ITEM_SPRITE.bronze : ITEM_SPRITE.rusty_hook;

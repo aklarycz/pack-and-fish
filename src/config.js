@@ -47,16 +47,26 @@ export const STARTER_HOOK = {
   w: 1, h: 1,
 };
 
-// Akcesoria. Efekt liczy się TYLKO gdy połączone (adjacency) z hakiem.
+// Akcesoria. `slots` = ile komórek gridu (poziomo) zajmuje item — tacklebox 3×3 = 9 slotów
+// pojemności, więc itemy wieloslotowe to wybór builda. `mount` = jak rysuje się na żyłce:
+// 'hook' (kotwica/brąz: terminalny hak na dole) lub 'side' (gadżet na ramieniu ciężarka).
+// Efekt połączenia (maxLatch/+ryba) liczy się TYLKO gdy akcesorium połączone (adjacency) z hakiem.
 // Brązowy hak — startowe akcesorium (z tutoriala): +7 atk (rusty 1 + brąz 7 = 8 → łowi bass/sum).
 export const BRONZE_HOOK = {
-  id: 'bronze', name: 'Brązowy hak', kind: 'accessory',
-  atk: 7, w: 1, h: 1, desc: '+7 atk (połącz z hakiem)',
+  id: 'bronze', name: 'Brązowy hak', kind: 'accessory', mount: 'hook',
+  atk: 7, slots: 1, w: 1, h: 1, desc: '+7 atk (połącz z hakiem)',
 };
 // Kotwica — z 1. skrzyni: +1 jednoczesny zaczep oraz +1 atk.
 export const ANCHOR = {
-  id: 'anchor', name: 'Kotwica', kind: 'accessory',
-  maxLatch: 1, atk: 1, w: 1, h: 1, desc: '+1 ryba naraz, +1 atk (połącz z hakiem)',
+  id: 'anchor', name: 'Kotwica', kind: 'accessory', mount: 'hook',
+  maxLatch: 1, atk: 1, slots: 1, w: 1, h: 1, desc: '+1 ryba naraz, +1 atk (połącz z hakiem)',
+};
+// Wyrzutnia rakiet — z 2. skrzyni: AUTONOMICZNA (działa niezależnie od połączenia). Co `rocketInterval` s
+// namierza najbliższą rybę (zaczepioną lub nie), nakłada mark i zdejmuje `rocketDmg` hp. Zajmuje 2 sloty.
+export const ROCKET = {
+  id: 'rocket', name: 'Wyrzutnia rakiet', kind: 'accessory', mount: 'side',
+  slots: 2, w: 2, h: 1, rocketDmg: 4, rocketInterval: 2,
+  desc: 'Co 2 s: 4 dmg do najbliższej ryby (działa też na zaczepioną). 2 sloty.',
 };
 
 // Rejestr itemów (lookup po id z gridu plecaka).
@@ -64,6 +74,7 @@ export const ITEMS = {
   [STARTER_HOOK.id]: STARTER_HOOK,
   [BRONZE_HOOK.id]: BRONZE_HOOK,
   [ANCHOR.id]: ANCHOR,
+  [ROCKET.id]: ROCKET,
 };
 
 // Nagroda ze skrzynki za ukończenie stage (≥1★). Pierwsza skrzynka wymusza Kotwicę.

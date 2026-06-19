@@ -94,6 +94,42 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     }
   }
 
+  // === AUTONOMICZNA WYRZUTNIA RAKIET === co rocketInterval namierza NAJBLIŻSZĄ rybę
+  // (zaczepioną lub nie) i zdejmuje rocketDmg hp — z tej samej puli co ręczne ogłuszanie.
+  if (s.hook.hasRocket) {
+    s.rocketCd -= dt;
+    if (s.rocketCd <= 0) {
+      let best = null, bestD = Infinity;
+      for (const f of s.fish) {
+        if (f.state === 'stunned' || f.state === 'escaped') continue;
+        const d = Math.hypot(f.x - hookX, f.y - hookWorldY);
+        if (d < bestD) { bestD = d; best = f; }
+      }
+      if (best) {
+        best.marked = true;
+        s.rockets.push({ target: best, x: hookX, y: hookWorldY, t: 0 });
+        s.rocketCd = s.hook.rocketInterval;
+      } else { s.rocketCd = 0.3; } // brak celu — spróbuj wkrótce
+    }
+  }
+  const ROCKET_FLIGHT = 0.32; // s lotu pocisku zanim zada dmg
+  for (let ri = s.rockets.length - 1; ri >= 0; ri--) {
+    const rk = s.rockets[ri];
+    rk.t += dt;
+    if (rk.t < ROCKET_FLIGHT) continue;
+    const f = rk.target;
+    s.rockets.splice(ri, 1);
+    if (!f || s.fish.indexOf(f) < 0 || f.state === 'stunned' || f.state === 'escaped') { if (f) f.marked = false; continue; }
+    f.hp -= s.hook.rocketDmg;
+    f.marked = false;
+    if (f.hp <= 0) {                       // rakieta dobiła rybę -> ogłuszenie + bańka + score
+      registerStun(s, FISH_TYPES[f.type]);
+      f.bubbleY = f.y; s.bubbles.push(f);
+      removeFish(s, f);
+      const li = s.latched.indexOf(f); if (li >= 0) s.latched.splice(li, 1);
+    }
+  }
+
   // bańki w górę + sprzątanie poza ekranem (zaczepione zostają)
   for (const b of s.bubbles) b.bubbleY -= 90 * dt;
   s.bubbles = s.bubbles.filter(b => b.bubbleY - s.depthPx > -40);
