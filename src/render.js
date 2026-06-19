@@ -144,7 +144,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b46'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b47'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -876,29 +876,32 @@ function renderDescent(ctx, s, hookX, hookY) {
 
   // żyłka — NIE prosta kreska: wygina się i reaguje na ruch. _lineLagX podąża z opóźnieniem
   // za hakiem → różnica (drag) wygina żyłkę w stronę przeciwną do ruchu; do tego delikatna fala.
+  // hak rysujemy OSTRZEM (dół obrazka) na linii zaczepu (hookY) — ryby łapią się na ostrzu,
+  // oczko jest WYŻEJ i tam łączy się żyłka.
+  const hookH = WORLD.H * 0.085;
+  const eyeletY = hookY - hookH * 0.82;           // oczko ~ górna część obrazka
   _lineLagX = _lineLagX === null ? hookX : _lineLagX + (hookX - _lineLagX) * 0.12;
   const drag = hookX - _lineLagX;                 // proxy prędkości bocznej
   const sway = Math.sin(nowD * 1.6) * 6;          // delikatne falowanie w wodzie
   ctx.strokeStyle = '#e8eef6'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(hookX - drag * 0.5, 0);              // góra (rod) lekko prowadzi
+  ctx.moveTo(hookX - drag * 0.5, 0);
   ctx.bezierCurveTo(
-    hookX - drag * 1.4 + sway, hookY * 0.34,      // cp1 — odstaje za ruchem
-    hookX - drag * 1.9 + sway * 0.6, hookY * 0.72, // cp2
-    hookX, hookY);                                 // koniec przy haku
+    hookX - drag * 1.4 + sway, eyeletY * 0.34,
+    hookX - drag * 1.9 + sway * 0.6, eyeletY * 0.72,
+    hookX, eyeletY);                               // żyłka kończy się na OCZKU haka
   ctx.stroke(); ctx.lineCap = 'butt';
-  // hak: zardzewiały bazowo, BRĄZOWY gdy podpięty brązowy hak (atk≥8); kotwiczka nakładana gdy +1 zacięcie
+  // JEDEN widoczny hak wg priorytetu: kotwiczka > brąz > rusty. Z kotwą+brązem → kotwa przekolorowana na brąz.
   const bronzeOn = s.hook && s.hook.atk >= 8;
   const trebleOn = s.hook && s.hook.maxLatch >= 2;
-  const hookH = WORLD.H * 0.075;
-  if (trebleOn) { // kotwiczka (treble) za hakiem — eyelet przy hookY, prongi wystają wokół
-    const tim = keyedEdge(ITEM_SPRITE.anchor);
-    if (tim) { const th = hookH * 1.1, tw = th * (tim.naturalWidth || tim.width) / (tim.naturalHeight || tim.height); ctx.globalAlpha = 0.95; ctx.drawImage(tim, hookX - tw / 2, hookY, tw, th); ctx.globalAlpha = 1; }
-  }
-  const him = keyedEdge(bronzeOn ? ITEM_SPRITE.bronze : ITEM_SPRITE.rusty_hook);
+  const hookSrc = trebleOn ? ITEM_SPRITE.anchor : bronzeOn ? ITEM_SPRITE.bronze : ITEM_SPRITE.rusty_hook;
+  const him = keyedEdge(hookSrc);
   if (him) {
     const hw = hookH * (him.naturalWidth || him.width) / (him.naturalHeight || him.height);
-    ctx.drawImage(him, hookX - hw / 2, hookY, hw, hookH); // eyelet (góra obrazka) przy hookY → żyłka łączy się z oczkiem
+    const dx = hookX - hw / 2, dy = hookY - hookH; // ostrze (dół) na hookY, oczko u góry
+    if (trebleOn && bronzeOn && 'filter' in ctx) ctx.filter = 'sepia(0.85) saturate(2.2) brightness(1.05)'; // kotwa → brąz
+    ctx.drawImage(him, dx, dy, hw, hookH);
+    ctx.filter = 'none';
   } else { ctx.fillStyle = '#dfe9f5'; ctx.beginPath(); ctx.arc(hookX, hookY, 8, 0, Math.PI * 2); ctx.fill(); }
 
   // top bar (HUD) na wierzchu — hak/ryby pod niego nie wchodzą
