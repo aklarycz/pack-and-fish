@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b70'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b71'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -177,29 +177,31 @@ export function render(ctx, s, hookX, hookY) {
 // === SPLASH / LOGIN (Guest) — overlay startowy. Art: pędzący Tofu (splash.png) + logo (logo.png) ===
 function renderSplash(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
+  // splash.png to PEŁNA kompozycja (logo + Tofu + ryby wmalowane). Logo/tytuł rysujemy TYLKO
+  // w fallbacku (gdy brak arta), żeby się nie dublowało z wmalowanym logo.
   const bg = img(SPLASH_SRC);
-  if (ready(bg)) { ctx.fillStyle = '#0b1f33'; ctx.fillRect(0, 0, W, H); drawCover(ctx, bg, 0, 0, W, H); }
+  const hasArt = ready(bg);
+  if (hasArt) { ctx.fillStyle = '#0b1f33'; ctx.fillRect(0, 0, W, H); drawCover(ctx, bg, 0, 0, W, H); }
   else { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1e6390'); g.addColorStop(1, '#06223a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
-  // scrim dołu (czytelność przycisków na dowolnym arcie)
-  let sc = ctx.createLinearGradient(0, H * 0.62, 0, H);
-  sc.addColorStop(0, 'rgba(4,18,31,0)'); sc.addColorStop(1, 'rgba(4,18,31,0.7)');
-  ctx.fillStyle = sc; ctx.fillRect(0, H * 0.62, W, H * 0.38);
-  // logo (PNG) lub fallback tekstowy
-  const logo = keyedEdge(LOGO_SRC); // logo ma zapieczone jasne tło → wytnij krawędziowo
-  if (logo) {
-    const ar = (logo.width || 1) / (logo.height || 1); // skala po WYSOKOŚCI (zachowaj proporcje)
-    let lh = H * 0.30, lw = lh * ar;
-    if (lw > W * 0.96) { lw = W * 0.96; lh = lw / ar; }
-    ctx.drawImage(logo, W / 2 - lw / 2, H * 0.012, lw, lh);
-  } else {
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffd24a'; ctx.font = `bold ${Math.round(H * 0.078)}px sans-serif`;
-    ctx.fillText('Pack&Fish', W / 2, H * 0.17);
-    ctx.fillStyle = '#bfe3ff'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`;
-    ctx.fillText('Zarzuć, złów, ulepszaj', W / 2, H * 0.215);
+  // scrim dołu (czytelność przycisków)
+  let sc = ctx.createLinearGradient(0, H * 0.68, 0, H);
+  sc.addColorStop(0, 'rgba(4,18,31,0)'); sc.addColorStop(1, 'rgba(4,18,31,0.72)');
+  ctx.fillStyle = sc; ctx.fillRect(0, H * 0.68, W, H * 0.32);
+  if (!hasArt) { // fallback: logo PNG (wykeyowane) lub tekst
+    const logo = keyedEdge(LOGO_SRC);
+    if (logo) {
+      const ar = (logo.width || 1) / (logo.height || 1);
+      let lh = H * 0.30, lw = lh * ar;
+      if (lw > W * 0.96) { lw = W * 0.96; lh = lw / ar; }
+      ctx.drawImage(logo, W / 2 - lw / 2, H * 0.012, lw, lh);
+    } else {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffd24a'; ctx.font = `bold ${Math.round(H * 0.078)}px sans-serif`;
+      ctx.fillText('Pack&Fish', W / 2, H * 0.17);
+    }
   }
   // 3 przyciski logowania (domyślny układ). AKTYWNY tylko Gość; Google/Apple = placeholdery ("wkrótce").
-  const bw = W * 0.66, bh = H * 0.07, bx = W / 2 - bw / 2, by1 = H * 0.785;
+  const bw = W * 0.66, bh = H * 0.07, bx = W / 2 - bw / 2, by1 = H * 0.80;
   roundedBtn(ctx, { x: bx, y: by1, w: bw, h: bh }, '#2e7d4f', 'GRAJ JAKO GOŚĆ');
   s._splashBtn = { x: bx, y: by1, w: bw, h: bh };
   // 2 loginy społecznościowe (nieaktywne, wyszarzone)
