@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createGame, placeHook, startStage, addDepth, registerStun, registerEscape,
   carouselMove, openBackpack, closeBackpack, stageUnlocked, descentCleared,
-  openChest, placeAccessory, moveItem, computeHookStats,
+  openChest, placeAccessory, moveItem, computeHookStats, loginGuest,
 } from '../src/state.js';
 import { STARTER_HOOK, FISH_TYPES, WORLD, STAGES } from '../src/config.js';
 
@@ -16,6 +16,14 @@ test('new game: HOME, stage 0 unlocked, rest locked, rusty hook pre-equipped (de
   assert.ok(s.hook);                          // zardzewiały hak jest DEFAULT (pre-założony)
   assert.equal(s.hook.atk, STARTER_HOOK.atk); // atk 1
   assert.equal(s.hook.maxLatch, 1);
+});
+
+test('new game shows splash; loginGuest enters the game', () => {
+  const s = createGame();
+  assert.equal(s.splash, true);
+  loginGuest(s);
+  assert.equal(s.splash, false);
+  assert.equal(s.mode, 'HOME');
 });
 
 test('carouselMove clamps to stage range', () => {

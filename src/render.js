@@ -86,6 +86,8 @@ const BUBBLE_SRC = 'assets/bubble.png';
 // itemy (hak/akcesoria) — ikony plecaka + nakładki na hak w minigrze
 const ITEM_SPRITE = { rusty_hook: 'assets/items/hook.png', bronze: 'assets/items/bronze.png', anchor: 'assets/items/anchor.png', rocket: 'assets/items/rocket.png' };
 const ROCKET_SHOT_SRC = 'assets/items/rocket-shot.png'; // pocisk (dziób w prawo → obracany w stronę celu)
+const SPLASH_SRC = 'assets/ui/splash.png'; // tło splash: pędzący Tofu z tackleboxem i wędką
+const LOGO_SRC = 'assets/ui/logo.png';     // logo "Pack&Fish"
 const FOLIAGE = 'assets/arenas/arena-01-foliage.png'; // przednie zarośla (Home) + fallback kurtyny
 const CURTAIN = 'assets/arenas/arena-01-curtain.png'; // dedykowana kurtyna przejścia (pełna wysokość, alfa)
 const REVEAL_HOLD = 0.3;  // ile kurtyna trzyma ZAKRYTE po wejściu pod wodę ("loading")
@@ -146,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b65'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b66'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -165,10 +167,42 @@ function drawFishSprite(ctx, im, cx, cy, radius, sx, alpha, tilt, dark) {
 
 export function render(ctx, s, hookX, hookY) {
   ctx.clearRect(0, 0, WORLD.W, WORLD.H);
+  if (s.splash) { renderSplash(ctx, s); return; } // overlay startowy (login Guest) na wierzchu wszystkiego
   if (s.mode === 'HOME') { renderHome(ctx, s); drawTutorial(ctx, s); return; }
   if (s.mode === 'BACKPACK') { renderBackpack(ctx, s); drawTutorial(ctx, s); return; }
   renderDescent(ctx, s, hookX, hookY);
   if (s.mode === 'END') renderEnd(ctx, s);
+}
+
+// === SPLASH / LOGIN (Guest) — overlay startowy. Art: pędzący Tofu (splash.png) + logo (logo.png) ===
+function renderSplash(ctx, s) {
+  const W = WORLD.W, H = WORLD.H;
+  const bg = img(SPLASH_SRC);
+  if (ready(bg)) { ctx.fillStyle = '#0b1f33'; ctx.fillRect(0, 0, W, H); drawCover(ctx, bg, 0, 0, W, H); }
+  else { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1e6390'); g.addColorStop(1, '#06223a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+  // scrim dołu (czytelność logo/przycisku na dowolnym arcie)
+  let sc = ctx.createLinearGradient(0, H * 0.55, 0, H);
+  sc.addColorStop(0, 'rgba(4,18,31,0)'); sc.addColorStop(1, 'rgba(4,18,31,0.88)');
+  ctx.fillStyle = sc; ctx.fillRect(0, H * 0.55, W, H * 0.45);
+  // logo (PNG) lub fallback tekstowy
+  const logo = img(LOGO_SRC);
+  if (ready(logo)) {
+    const lw = W * 0.82, lh = lw * (logo.naturalHeight || 1) / (logo.naturalWidth || 1);
+    ctx.drawImage(logo, W / 2 - lw / 2, H * 0.06, lw, Math.min(lh, H * 0.26));
+  } else {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd24a'; ctx.font = `bold ${Math.round(H * 0.078)}px sans-serif`;
+    ctx.fillText('Pack&Fish', W / 2, H * 0.17);
+    ctx.fillStyle = '#bfe3ff'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`;
+    ctx.fillText('Zarzuć, złów, ulepszaj', W / 2, H * 0.215);
+  }
+  // przycisk Guest
+  const bw = W * 0.62, bh = H * 0.078, bx = W / 2 - bw / 2, by = H * 0.82;
+  roundedBtn(ctx, { x: bx, y: by, w: bw, h: bh }, '#2e7d4f', 'GRAJ JAKO GOŚĆ');
+  s._splashBtn = { x: bx, y: by, w: bw, h: bh };
+  ctx.fillStyle = 'rgba(207,226,245,0.5)'; ctx.textAlign = 'center'; ctx.font = `${Math.round(H * 0.016)}px sans-serif`;
+  ctx.fillText('Logowanie kontem — wkrótce', W / 2, by + bh + H * 0.03);
+  ctx.textAlign = 'left';
 }
 
 // === TUTORIAL: dymki + łapka + strzałki, sterowany stanem ===

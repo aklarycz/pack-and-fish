@@ -1,5 +1,5 @@
 import { WORLD, BACKPACK, layoutWorld, CAST_DUR, ITEMS, TEST_ENDLESS_DESCENT } from './config.js';
-import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
+import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest, loginGuest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
@@ -47,6 +47,7 @@ function cellAt(gi, x, y) {
 
 attachInput(canvas, {
   onPointerDown(x, y) {
+    if (s.splash) { if (hit(s._splashBtn, x, y)) loginGuest(s); return; } // ekran startowy: tylko przycisk Guest
     if (s.mode === 'HOME') {
       if (s.chestReveal) { dismissChest(s); return; }  // tap zamyka reveal skrzynki
       const h = s._home;

@@ -49,6 +49,7 @@ export function createGame() {
     : createGrid(tb.cols, tb.rows);                 // brak/zła długość (np. po upgrade) -> świeży grid
   return {
     mode: 'HOME',
+    splash: true,         // ekran startowy (login Guest) — overlay nad HOME do kliknięcia "Graj jako Gość"
     stageIndex: 0,
     progress,
     grid,
@@ -103,6 +104,8 @@ export function closeBackpack(s) {
   if (dirty) saveProgress(s.progress);
 }
 export function returnHome(s) { s.mode = 'HOME'; s.cast = null; s.reveal = null; }
+// splash/login: wejście do gry jako Gość (zamyka overlay startowy)
+export function loginGuest(s) { s.splash = false; }
 
 // --- plecak: hak (tutorial) + akcesoria ---
 export function placeHook(s, col, row) {
