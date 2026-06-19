@@ -1,4 +1,4 @@
-import { WORLD, BACKPACK, layoutWorld, CAST_DUR } from './config.js';
+import { WORLD, BACKPACK, layoutWorld, CAST_DUR, ITEMS } from './config.js';
 import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
@@ -65,8 +65,8 @@ attachInput(canvas, {
       const cell = cellAt(s._grid, x, y);
       if (!s.hook) {
         if (cell >= 0) placeHook(s, cell % BACKPACK.cols, Math.floor(cell / BACKPACK.cols));
-      } else if (cell >= 0 && s.grid.cells[cell]) {
-        s.bpDrag = { fromIdx: cell, id: s.grid.cells[cell], x, y, ox: x, oy: y, moved: false }; // tap=opis / drag=przenieś
+      } else if (cell >= 0 && s.grid.cells[cell] && ITEMS[s.grid.cells[cell]] && ITEMS[s.grid.cells[cell]].kind !== 'hook') {
+        s.bpDrag = { fromIdx: cell, id: s.grid.cells[cell], x, y, ox: x, oy: y, moved: false }; // tap=opis / drag=przenieś (bazowego haka nie ruszamy)
       } else if (s._bpInv) {
         for (const it of s._bpInv) if (hit(it.rect, x, y)) { selectAccessory(s, it.id); break; } // klik = opis
       }

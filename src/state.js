@@ -130,7 +130,7 @@ export function selectAccessory(s, id) { s.bpSelected = { id, gridIdx: null }; }
 // wybór itemu W gridzie (tap, nie drag) → opis + WYPNIJ (jeśli akcesorium)
 export function selectPlaced(s, gridIdx) {
   const id = s.grid.cells[gridIdx];
-  if (id && ITEMS[id]) s.bpSelected = { id, gridIdx };
+  if (id && ITEMS[id] && ITEMS[id].kind !== 'hook') s.bpSelected = { id, gridIdx }; // bazowego haka nie zaznaczamy
 }
 // wypnij akcesorium z gridu z powrotem do ekwipunku (haka nie wypinamy)
 export function unequipAccessory(s, gridIdx) {

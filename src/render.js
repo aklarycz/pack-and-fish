@@ -144,7 +144,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b48'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b50'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -707,6 +707,18 @@ function drawItemCell(ctx, it, x, y, cell) {
   }
 }
 
+// Slot bazy haka w plecaku — NIE kolekcjonowalny item, tylko subtelny wskaźnik „tu jest hak,
+// dołącz akcesoria obok". Sam zardzewiały hak widać dopiero na żyłce w grze (gdy brak hook-akcesoriów).
+function drawHookSlot(ctx, x, y, cell) {
+  // baza haka — NEUTRALNY slot (kreskowany + pierścień zaczepu), bez wizualu zardzewiałego haka.
+  // Sam hak widać dopiero na żyłce w grze (gdy brak hook-akcesoriów).
+  fillRR(ctx, x + cell * 0.12, y + cell * 0.12, cell * 0.76, cell * 0.76, 6, 'rgba(120,150,180,0.08)');
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(160,190,220,0.4)'; ctx.lineWidth = 1.5;
+  rrPath(ctx, x + cell * 0.12, y + cell * 0.12, cell * 0.76, cell * 0.76, 6); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(180,205,230,0.5)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x + cell / 2, y + cell / 2, cell * 0.13, 0, Math.PI * 2); ctx.stroke(); // pierścień = punkt zaczepu
+}
+
 function renderBackpack(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
   ctx.fillStyle = '#0a2236'; ctx.fillRect(0, 0, W, H);
@@ -722,8 +734,12 @@ function renderBackpack(ctx, s) {
     const idx = r * BACKPACK.cols + c;
     const id = s.grid.cells[idx];
     if (id && ITEMS[id] && !(s.bpDrag && s.bpDrag.fromIdx === idx)) {
-      drawItemCell(ctx, ITEMS[id], cellX, cellY, bcell);
-      if (s.bpSelected && s.bpSelected.gridIdx === idx) { rrPath(ctx, cellX, cellY, bcell, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke(); }
+      if (ITEMS[id].kind === 'hook') {
+        drawHookSlot(ctx, cellX, cellY, bcell); // baza (zardzewiały hak) — subtelny slot, nie item
+      } else {
+        drawItemCell(ctx, ITEMS[id], cellX, cellY, bcell);
+        if (s.bpSelected && s.bpSelected.gridIdx === idx) { rrPath(ctx, cellX, cellY, bcell, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke(); }
+      }
     }
   }
   s._grid = { ox, oy, cell: bcell };
