@@ -74,10 +74,10 @@ export const CHEST_SC = 120;
 export const CAST_DUR = 1.9;
 export const CAST_ANIM = 1.2; // ile z tego trwa sama animacja zarzutu (reszta = zjazd/kurtyna)
 
-// TRYB TESTOWY: nieskończone schodzenie — łowisko nie kończy się po wyczerpaniu worka,
-// ryby dolewają się wg głębokości, descentCleared nie odpala. Pozwala testować dowolną
-// głębokość (przyciemnianie, wizual). Ustaw false, by wrócić do skończonych stage'y.
-export const TEST_ENDLESS_DESCENT = true;
+// Nieskończone schodzenie — łowisko nie kończy się po wyczerpaniu worka (ryby dolewają się
+// wg głębokości, descentCleared nie odpala). NA STAGE'ACH WYŁĄCZONE (skończona liczba ryb —
+// inaczej łatwo przegrać). Przyszły osobny tryb: endless z rankingami i nagrodami za best.
+export const TEST_ENDLESS_DESCENT = false;
 // TRYB TESTOWY: zdejmuje granicę sterowania hakiem (pasmo hookMinX/Max, hookMinY/Max) —
 // hak można prowadzić po całym ekranie. Ustaw false, by wrócić do normalnego pasma ruchu.
 export const TEST_FREE_HOOK = true;

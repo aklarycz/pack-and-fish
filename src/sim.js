@@ -16,7 +16,11 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   if (s.reveal) return; // kurtyna jeszcze zakrywa/odsłania — hak nie tonie, ryby nie spawnują
   // trudność liczona od głębokości + offsetu stage'a (stage startuje "głębiej")
   const depthM = s.depthPx / WORLD.pxPerMeter + (s.stageOffsetM || 0);
-  const diff = difficultyAt(depthM);
+  // TRYB TESTOWY: zamrażamy skalowanie trudności (hp/prędkość ryb) na płytkim poziomie,
+  // by ryby były łowialne na DOWOLNEJ testowej głębokości (inaczej hp sumów rośnie w nieskończoność).
+  // Realny depthPx (przyciemnianie, score) dalej rośnie normalnie.
+  const effDepthM = s.endless ? Math.min(depthM, 10) : depthM;
+  const diff = difficultyAt(effDepthM);
   addDepth(s, s.hook.szybkoscOpadania * dt);
 
   // spawn — GŁÓWNIE z boków (ryba wpływa poziomo do środka i przecina scenę),
@@ -53,7 +57,7 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
       fdir = rng() < 0.5 ? 1 : -1;
       fy = s.depthPx + WORLD.H + 30;
     }
-    const f = createFish(type, depthM, fx, rng);
+    const f = createFish(type, effDepthM, fx, rng);
     f.y = fy;
     f.dir = fdir;
     s.fish.push(f);

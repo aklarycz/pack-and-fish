@@ -144,7 +144,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b54'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b55'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -270,23 +270,25 @@ function tutArrow(ctx, x1, y1, x2, y2) {
 function drawWaterShimmer(ctx, W, H, t) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
+  // pasma celowane w FAKTYCZNĄ wodę na grafice: dalekie odbicie zachodu (za molem) i
+  // główna tafla przybrzeża MIĘDZY molem a panelem STAGE (poprzednio celowałem pod UI).
   const bands = [
-    { y0: 0.37, y1: 0.45, n: 3, col: '255,224,168', amax: 0.10 }, // dalekie odbicie (ciepłe, subtelne)
-    { y0: 0.80, y1: 0.93, n: 5, col: '198,236,255', amax: 0.17 }, // przybrzeże (chłodne błyski na ciemnej wodzie)
+    { y0: 0.31, y1: 0.41, n: 3, col: '255,228,172', amax: 0.13, drift: 0.16 }, // dalekie odbicie (ciepłe)
+    { y0: 0.62, y1: 0.79, n: 6, col: '202,240,255', amax: 0.28, drift: 0.26 }, // główna tafla (chłodne błyski)
   ];
   for (const b of bands) {
     for (let i = 0; i < b.n; i++) {
-      const ph = t * 0.8 + i * 1.9;
+      const ph = t * 0.85 + i * 1.7;
       const y = H * (b.y0 + (b.y1 - b.y0) * ((i + 0.5) / b.n));
-      const cxw = W * 0.5 + Math.sin(ph * 0.7 + i) * W * 0.22;
-      const w = W * (0.18 + 0.06 * Math.sin(ph));
-      const a = (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(ph))) * b.amax;
+      const cxw = W * 0.5 + Math.sin(ph * 0.7 + i) * W * b.drift;
+      const w = W * (0.22 + 0.07 * Math.sin(ph));
+      const a = (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(ph))) * b.amax;
       const grd = ctx.createLinearGradient(cxw - w, 0, cxw + w, 0);
       grd.addColorStop(0, `rgba(${b.col},0)`);
       grd.addColorStop(0.5, `rgba(${b.col},${a.toFixed(3)})`);
       grd.addColorStop(1, `rgba(${b.col},0)`);
       ctx.fillStyle = grd;
-      ctx.fillRect(cxw - w, y, w * 2, Math.max(2, H * 0.004));
+      ctx.fillRect(cxw - w, y, w * 2, Math.max(2, H * 0.0055));
     }
   }
   ctx.restore();
