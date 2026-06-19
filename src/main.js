@@ -1,4 +1,4 @@
-import { WORLD, BACKPACK, layoutWorld, CAST_DUR, ITEMS } from './config.js';
+import { WORLD, BACKPACK, layoutWorld, CAST_DUR, ITEMS, TEST_ENDLESS_DESCENT } from './config.js';
 import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
@@ -99,7 +99,7 @@ function loop(ts) {
   last = ts;
   if (s.cast) {
     s.cast.t += dt;
-    if (s.cast.t >= CAST_DUR) { s.cast = null; if (startStage(s)) { hookX = hookTX = WORLD.W / 2; hookY = hookTY = WORLD.hookStartY; s.reveal = { t: 0 }; } }
+    if (s.cast.t >= CAST_DUR) { s.cast = null; if (startStage(s)) { hookX = hookTX = WORLD.W / 2; hookY = hookTY = WORLD.hookStartY; s.reveal = { t: 0 }; s.endless = TEST_ENDLESS_DESCENT; } }
   }
   if (s.reveal) { s.reveal.t += dt; if (s.reveal.t >= 0.85) s.reveal = null; } // HOLD+OPEN; potem hak tonie
   // hak nadąża za palcem z LIMITEM prędkości (spowolnione manewrowanie)

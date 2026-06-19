@@ -144,7 +144,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b52'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b53'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -264,29 +264,34 @@ function tutArrow(ctx, x1, y1, x2, y2) {
   ctx.closePath(); ctx.fillStyle = '#ffcb45'; ctx.fill(); ctx.lineCap = 'butt';
 }
 
-// Delikatny ruch wody na Home: miękkie, dryfujące refleksy + cienkie błyski na tafli (additive).
+// Ruch wody na Home: miękkie, dryfujące refleksy + przewijające się zmarszczki na tafli (additive).
+// Pasmo wody: lake (~0.40) + przybrzeże (~0.60–0.82). Wyraźne, bo grafika wody jest statyczna.
 function drawWaterShimmer(ctx, W, H, t) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 6; i++) {
-    const ph = t * 0.5 + i * 1.7;
-    const x = W * (0.12 + 0.16 * i) + Math.sin(ph) * W * 0.05;
-    const y = H * (0.58 + 0.035 * i) + Math.sin(ph * 1.3) * H * 0.006;
-    const r = W * (0.07 + 0.025 * Math.sin(ph * 0.8));
-    const a = (0.5 + 0.5 * Math.sin(ph)) * 0.05;
-    if (a < 0.004 || r <= 0) continue;
+  // miękkie refleksy świetlne dryfujące po tafli
+  for (let i = 0; i < 9; i++) {
+    const ph = t * 0.6 + i * 1.3;
+    const x = W * (0.08 + 0.11 * i) + Math.sin(ph) * W * 0.06;
+    const y = H * (0.42 + 0.045 * i) + Math.sin(ph * 1.3) * H * 0.012;
+    const r = W * (0.11 + 0.045 * Math.sin(ph * 0.8));
+    const a = (0.55 + 0.45 * Math.sin(ph)) * 0.17;
+    if (r <= 0) continue;
     const grd = ctx.createRadialGradient(x, y, 0, x, y, r);
-    grd.addColorStop(0, `rgba(200,235,255,${a.toFixed(3)})`); grd.addColorStop(1, 'rgba(200,235,255,0)');
+    grd.addColorStop(0, `rgba(175,228,255,${a.toFixed(3)})`); grd.addColorStop(1, 'rgba(175,228,255,0)');
     ctx.fillStyle = grd;
-    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.32, 0, 0, Math.PI * 2); ctx.fill(); // spłaszczone = refleks
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.30, 0, 0, Math.PI * 2); ctx.fill(); // spłaszczone = refleks
   }
-  for (let i = 0; i < 4; i++) { // cienkie poziome błyski bliżej dołu
-    const ph = t * 0.9 + i * 2.1;
-    const x = W * (0.2 + 0.2 * i) + Math.sin(ph * 1.1) * W * 0.04;
-    const y = H * (0.70 + 0.025 * i), w = W * 0.12, a = (0.5 + 0.5 * Math.sin(ph)) * 0.04;
+  // poziome zmarszczki/błyski przesuwające się w bok — wyraźny ruch tafli
+  for (let i = 0; i < 6; i++) {
+    const ph = t * 1.0 + i * 1.6;
+    const x = W * 0.5 + Math.sin(ph * 0.9) * W * 0.30;
+    const y = H * (0.50 + 0.055 * i);
+    const w = W * (0.16 + 0.05 * Math.sin(ph));
+    const a = (0.5 + 0.5 * Math.sin(ph)) * 0.14;
     const grd = ctx.createLinearGradient(x - w, 0, x + w, 0);
-    grd.addColorStop(0, 'rgba(210,240,255,0)'); grd.addColorStop(0.5, `rgba(210,240,255,${a.toFixed(3)})`); grd.addColorStop(1, 'rgba(210,240,255,0)');
-    ctx.fillStyle = grd; ctx.fillRect(x - w, y, w * 2, Math.max(1.5, H * 0.003));
+    grd.addColorStop(0, 'rgba(205,242,255,0)'); grd.addColorStop(0.5, `rgba(205,242,255,${a.toFixed(3)})`); grd.addColorStop(1, 'rgba(205,242,255,0)');
+    ctx.fillStyle = grd; ctx.fillRect(x - w, y, w * 2, Math.max(2, H * 0.005));
   }
   ctx.restore();
 }

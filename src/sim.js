@@ -22,6 +22,14 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   // spawn — GŁÓWNIE z boków (ryba wpływa poziomo do środka i przecina scenę),
   // część z dołu dla urozmaicenia. Boczny spawn sprawia, że dominującym ruchem
   // jest pływanie w bok, a nie "lecenie w górę" przez cały ekran.
+  // TRYB TESTOWY: worek pusty -> dolewaj ryby wg głębokości (nieskończone schodzenie)
+  if (s.endless && s.fishQueue.length === 0) {
+    const r = rng();
+    const tt = depthM < 15 ? (r < 0.7 ? 'plotka' : 'sredniak')
+      : depthM < 35 ? (r < 0.4 ? 'plotka' : r < 0.85 ? 'sredniak' : 'twardziel')
+        : (r < 0.25 ? 'sredniak' : 'twardziel');
+    s.fishQueue.push(tt);
+  }
   s.spawnTimer -= dt;
   if (s.spawnTimer <= 0 && s.fishQueue.length > 0) {
     const sp = STAGES[s.stageIndex].spawn;
@@ -88,5 +96,6 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   s.fish = s.fish.filter(f => s.latched.indexOf(f) >= 0 || (f.y - s.depthPx) > -160);
 
   // pula wyczerpana i wszystkie ryby zeszły/rozstrzygnięte -> łowisko wyczyszczone
-  if (s.fishQueue.length === 0 && s.fish.length === 0 && s.latched.length === 0) descentCleared(s);
+  // (w trybie testowym nieskończonym worek nigdy nie jest pusty, więc to nie odpala)
+  if (!s.endless && s.fishQueue.length === 0 && s.fish.length === 0 && s.latched.length === 0) descentCleared(s);
 }

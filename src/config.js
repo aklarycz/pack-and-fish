@@ -74,6 +74,11 @@ export const CHEST_SC = 120;
 export const CAST_DUR = 1.9;
 export const CAST_ANIM = 1.2; // ile z tego trwa sama animacja zarzutu (reszta = zjazd/kurtyna)
 
+// TRYB TESTOWY: nieskończone schodzenie — łowisko nie kończy się po wyczerpaniu worka,
+// ryby dolewają się wg głębokości, descentCleared nie odpala. Pozwala testować dowolną
+// głębokość (przyciemnianie, wizual). Ustaw false, by wrócić do skończonych stage'y.
+export const TEST_ENDLESS_DESCENT = true;
+
 // 3 archetypy: jedna oś = HP vs okno. scoreValue liczy się przy ogłuszeniu.
 export const FISH_TYPES = {
   // speed = pozioma prędkość pływania (px/s). Wyższa niż szybkoscOpadania, żeby

@@ -50,7 +50,7 @@ export function createGame() {
     bpSelected: null,     // akcesorium wybrane do podglądu opisu (id)
     // pola descentu (resetowane w startStage)
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
-    fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [],
+    fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [], endless: false,
     lastResult: null,
   };
 }
