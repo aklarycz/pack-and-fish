@@ -213,3 +213,12 @@ export const BACKPACK = {
   rows: 3,
   cell: 96,        // px komórki
 };
+
+// Poziomy tackleboxa — pojemność (cols×rows) rośnie z lepszym tackleboxem. Ikona pod gridem
+// i rozmiar gridu biorą się z bieżącego poziomu (progress.tackleboxTier). Tier 0 = start (3×3).
+export const TACKLEBOX_TIERS = [
+  { cols: 3, rows: 3, name: 'Stary tacklebox', body: '#3c4a3a', trim: '#caa24a' },
+  { cols: 4, rows: 3, name: 'Tacklebox podróżny', body: '#33485a', trim: '#7fc6ff' },
+  { cols: 4, rows: 4, name: 'Tacklebox mistrza', body: '#46365a', trim: '#c08bff' },
+];
+export function tackleboxOf(tier) { return TACKLEBOX_TIERS[Math.max(0, Math.min(TACKLEBOX_TIERS.length - 1, tier || 0))]; }

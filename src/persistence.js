@@ -17,6 +17,7 @@ export function defaultProgress(stageCount) {
     pendingChests: 0,    // skrzynki do otwarcia na Home
     gotAnchor: false,    // czy pierwsza (wymuszona) Kotwica już przyznana
     gotRocket: false,    // czy druga (wymuszona) Wyrzutnia rakiet już przyznana
+    tackleboxTier: 0,    // poziom tackleboxa (pojemność gridu) — rośnie z lepszym tackleboxem
     inventory: { bronze: 1 }, // start: brązowy hak (z tutoriala) — +7 atk po połączeniu
     tutBronzeDone: false,     // czy tutorial zakładania brązowego haka zaliczony
     tutAnchorDone: false, // czy tutorial łączenia kotwicy zaliczony
@@ -40,6 +41,7 @@ export function loadProgress(stageCount) {
           prog.pendingChests = data.pendingChests || 0;
           prog.gotAnchor = !!data.gotAnchor;
           prog.gotRocket = !!data.gotRocket;
+          prog.tackleboxTier = data.tackleboxTier || 0;
           prog.inventory = data.inventory || {};
           prog.tutAnchorDone = !!data.tutAnchorDone;
         }

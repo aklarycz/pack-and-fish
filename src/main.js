@@ -36,12 +36,13 @@ function hit(r, x, y) {
   return r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
 
-// indeks pola plecaka pod (x,y) lub -1
+// indeks pola plecaka pod (x,y) lub -1 (wymiary z bieżącego gridu — rosną z tackleboxem)
 function cellAt(gi, x, y) {
   if (!gi) return -1;
+  const cols = s.grid.cols, rows = s.grid.rows;
   const c = Math.floor((x - gi.ox) / gi.cell), r = Math.floor((y - gi.oy) / gi.cell);
-  if (c < 0 || r < 0 || c >= BACKPACK.cols || r >= BACKPACK.rows) return -1;
-  return r * BACKPACK.cols + c;
+  if (c < 0 || r < 0 || c >= cols || r >= rows) return -1;
+  return r * cols + c;
 }
 
 attachInput(canvas, {
@@ -64,7 +65,7 @@ attachInput(canvas, {
       if (s._bpUnequipBtn && hit(s._bpUnequipBtn, x, y)) { unequipAccessory(s, s.bpSelected.gridIdx); return; }
       const cell = cellAt(s._grid, x, y);
       if (!s.hook) {
-        if (cell >= 0) placeHook(s, cell % BACKPACK.cols, Math.floor(cell / BACKPACK.cols));
+        if (cell >= 0) placeHook(s, cell % s.grid.cols, Math.floor(cell / s.grid.cols));
       } else if (cell >= 0 && s.grid.cells[cell] && ITEMS[s.grid.cells[cell]] && ITEMS[s.grid.cells[cell]].kind !== 'hook') {
         s.bpDrag = { fromIdx: cell, id: s.grid.cells[cell], x, y, ox: x, oy: y, moved: false }; // tap=opis / drag=przenieś (bazowego haka nie ruszamy)
       } else if (s._bpInv) {

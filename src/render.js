@@ -1,4 +1,4 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf, tackleboxOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
 import { gridItems, itemOrigin } from './logic/backpack.js';
 
@@ -146,7 +146,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b63'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b64'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -347,10 +347,8 @@ function renderHome(ctx, s) {
   const xpX = W * 0.155, xpY = H * 0.046, xpW = W * 0.20, xpH = H * 0.013;
   fillRR(ctx, xpX, xpY, xpW, xpH, xpH / 2, 'rgba(14,34,51,0.6)');
   fillRR(ctx, xpX, xpY, xpW * xpFrac, xpH, xpH / 2, '#52d0ff');
-  const chW = W * 0.165, chH = H * 0.046, chU = H * 0.012, chY = H * 0.046;
-  chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', String(s.progress.coins));
-  chip(ctx, W * 0.95 - chW - chU, chY, chW, chH, '#52d0ff', '0');
-  chip(ctx, W * 0.95 - 2 * (chW + chU), chY, chW, chH, '#7cff8a', '∞');
+  const chW = W * 0.165, chH = H * 0.046, chY = H * 0.046;
+  chip(ctx, W * 0.95, chY, chW, chH, '#ffcb45', String(s.progress.coins)); // tylko złoto (reszta wyłączona)
 
   // === Nazwa ARENY (góra) — strzałki przełączają ARENĘ (zmieniają scenę) ===
   const ar = W * 0.05, arCy = H * 0.135;
@@ -746,42 +744,81 @@ function drawItemSpan(ctx, it, x, y, wpx, hpx, bg) {
   }
 }
 
+// Obudowa tackleboxa (proceduralna) — grid siedzi w środku. Styl/kolor wg poziomu (tb).
+function drawTacklebox(ctx, x, y, w, h, tb) {
+  const r = Math.max(8, Math.min(w, h) * 0.07);
+  // uchwyt nad korpusem
+  const hw = w * 0.30, hx = x + w / 2 - hw / 2, hTop = y - h * 0.16;
+  ctx.save();
+  ctx.strokeStyle = tb.trim; ctx.lineWidth = Math.max(5, h * 0.028); ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(hx, y + 4);
+  ctx.lineTo(hx, hTop + hw * 0.5);
+  ctx.arc(hx + hw / 2, hTop + hw * 0.5, hw / 2, Math.PI, 0);
+  ctx.lineTo(hx + hw, y + 4);
+  ctx.stroke();
+  ctx.restore();
+  // korpus
+  fillRR(ctx, x, y, w, h, r, tb.body);
+  rrPath(ctx, x, y, w, h, r); ctx.strokeStyle = tb.trim; ctx.lineWidth = Math.max(3, h * 0.02); ctx.stroke();
+  // górna listwa (pokrywa/zatrzask)
+  fillRR(ctx, x + w * 0.04, y + h * 0.03, w * 0.92, h * 0.10, r * 0.6, 'rgba(0,0,0,0.22)');
+  fillRR(ctx, x + w / 2 - w * 0.06, y + h * 0.05, w * 0.12, h * 0.055, 4, tb.trim); // zatrzask na środku
+  // nity po bokach
+  ctx.fillStyle = tb.trim;
+  for (const py of [y + h * 0.45, y + h * 0.75]) for (const px of [x + w * 0.045, x + w * 0.955]) {
+    ctx.beginPath(); ctx.arc(px, py, Math.max(2, h * 0.013), 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 function renderBackpack(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
   ctx.fillStyle = '#0a2236'; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#e6f0ff'; ctx.font = `bold ${Math.round(H * 0.03)}px sans-serif`; ctx.textAlign = 'center';
-  ctx.fillText(s.hook ? 'Plecak' : 'Włóż hak do plecaka', W / 2, H * 0.08);
+  ctx.fillText(s.hook ? 'Plecak' : 'Włóż hak do plecaka', W / 2, H * 0.065);
 
-  const bcell = Math.round(Math.min(W * 0.22, H * 0.105)); // responsywne pole (mieści się na telefonie)
-  const gw = BACKPACK.cols * bcell, gh = BACKPACK.rows * bcell;
-  const ox = (W - gw) / 2, oy = H * 0.11;
-  // 1) ramki wszystkich komórek
-  for (let r = 0; r < BACKPACK.rows; r++) for (let c = 0; c < BACKPACK.cols; c++) {
-    ctx.strokeStyle = '#2c5a82'; ctx.lineWidth = 2; ctx.strokeRect(ox + c * bcell, oy + r * bcell, bcell, bcell);
+  // wymiary gridu z bieżącego tackleboxa (rosną z lepszym tackleboxem)
+  const cols = s.grid.cols, rows = s.grid.rows;
+  const tb = tackleboxOf(s.progress.tackleboxTier);
+  const bcell = Math.round(Math.min((W * 0.74) / cols, H * 0.092));
+  const gw = cols * bcell, gh = rows * bcell;
+  const ox = Math.round((W - gw) / 2), oy = Math.round(H * 0.175);
+
+  // OBUDOWA TACKLEBOXA pod gridem (grid siedzi w środku); zmienia się z poziomem
+  const pad = Math.round(bcell * 0.34);
+  drawTacklebox(ctx, ox - pad, oy - pad, gw + 2 * pad, gh + 2 * pad, tb);
+
+  // 1) ramki wszystkich komórek (wewnętrzna taca)
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    fillRR(ctx, ox + c * bcell + 2, oy + r * bcell + 2, bcell - 4, bcell - 4, 6, 'rgba(8,20,30,0.5)');
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 2; ctx.strokeRect(ox + c * bcell, oy + r * bcell, bcell, bcell);
   }
   // 2) itemy — każdy RAZ, rozciągnięty na swój footprint (slots×1). Pomijamy aktualnie przeciągany.
   const dragOrigin = s.bpDrag ? itemOrigin(s.grid, s.bpDrag.fromIdx) : -1;
   for (const { id, idx, w } of gridItems(s.grid, ITEMS)) {
     if (!ITEMS[id] || idx === dragOrigin) continue;
-    const c = idx % BACKPACK.cols, r = Math.floor(idx / BACKPACK.cols);
+    const c = idx % cols, r = Math.floor(idx / cols);
     const cx = ox + c * bcell, cy = oy + r * bcell, wpx = w * bcell;
     drawItemSpan(ctx, ITEMS[id], cx, cy, wpx, bcell, true); // tło rzadkości
-
     if (s.bpSelected && itemOrigin(s.grid, s.bpSelected.gridIdx) === idx) {
       rrPath(ctx, cx, cy, wpx, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke();
     }
   }
   s._grid = { ox, oy, cell: bcell };
+  // nazwa tackleboxa pod obudową
+  ctx.fillStyle = tb.trim; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(H * 0.019)}px sans-serif`;
+  ctx.fillText(tb.name + `  (${cols}×${rows})`, W / 2, oy + gh + pad + H * 0.028);
 
-  // staty haka (efekt ułożenia/adjacency) + hint przeciągania
+  // staty haka (efekt ułożenia/adjacency) + hint przeciągania — pod obudową i nazwą tackleboxa
+  const belowY = oy + gh + pad + H * 0.055;
   if (s.hook) {
     ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`; ctx.textAlign = 'center';
-    ctx.fillText(`Hak: ${s.hook.atk} atk · łapie ${s.hook.maxLatch} naraz`, W / 2, oy + gh + H * 0.04);
+    ctx.fillText(`Hak: ${s.hook.atk} atk · łapie ${s.hook.maxLatch} naraz`, W / 2, belowY);
     ctx.fillStyle = 'rgba(207,226,245,0.6)'; ctx.font = `${Math.round(H * 0.017)}px sans-serif`;
-    ctx.fillText('Połącz Kotwicę z Brązowym hakiem (obok) — wtedy +1 ryba', W / 2, oy + gh + H * 0.065);
+    ctx.fillText('Połącz Kotwicę z Brązowym hakiem (obok) — wtedy +1 ryba', W / 2, belowY + H * 0.025);
   }
 
-  let y = oy + gh + H * 0.10;
+  let y = belowY + H * 0.06;
   s._bpInv = [];
   s._bpPlaceBtn = null;
   s._bpUnequipBtn = null;

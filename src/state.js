@@ -1,4 +1,4 @@
-import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf } from './config.js';
+import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf, tackleboxOf } from './config.js';
 import { createGrid, placeItem, findFreeRun, itemOrigin, gridItems } from './logic/backpack.js';
 import { computeScore, computeStars } from './logic/scoring.js';
 import { loadProgress, saveProgress } from './persistence.js';
@@ -43,9 +43,10 @@ export function computeHookStats(grid) {
 
 export function createGame() {
   const progress = loadProgress(STAGES.length);
-  const grid = progress.grid
-    ? { cols: BACKPACK.cols, rows: BACKPACK.rows, cells: [...progress.grid] }
-    : createGrid(BACKPACK.cols, BACKPACK.rows);
+  const tb = tackleboxOf(progress.tackleboxTier);   // pojemność gridu z poziomu tackleboxa
+  const grid = (progress.grid && progress.grid.length === tb.cols * tb.rows)
+    ? { cols: tb.cols, rows: tb.rows, cells: [...progress.grid] }
+    : createGrid(tb.cols, tb.rows);                 // brak/zła długość (np. po upgrade) -> świeży grid
   return {
     mode: 'HOME',
     stageIndex: 0,
