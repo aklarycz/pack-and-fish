@@ -145,7 +145,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b59'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b60'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -965,32 +965,21 @@ function renderDescent(ctx, s, hookX, hookY) {
     hookX, eyeletY);                               // żyłka kończy się na OCZKU haka
   ctx.stroke(); ctx.lineCap = 'butt';
 
-  // === CIĘŻARKI + boczne attachementy (auto-wizual) === żeby gadżety nie wisiały w powietrzu:
-  // każde 2 attachementy (mount:'side') = 1 ciężarek na żyłce; attachement L wypełnia się przed P.
+  // === BOCZNE ATTACHEMENTY na żyłce === gadżety (mount:'side') mają WBUDOWANE zaciski, więc
+  // montują się wprost na żyłce nad hakiem, stackowane w górę i naprzemiennie L/P (żeby się nie
+  // nakładały). Sprite flipowany dla lewej strony, by zacisk patrzył na żyłkę.
   const sideItems = gridItems(s.grid, ITEMS).filter(g => ITEMS[g.id] && ITEMS[g.id].mount === 'side');
-  if (sideItems.length) {
-    const wGap = hookH * 0.52, armLen = hookH * 0.5, aSize = hookH * 0.5;
-    const nW = Math.ceil(sideItems.length / 2);
-    for (let j = 0; j < nW; j++) {
-      const wy = eyeletY - (j + 1) * wGap;
-      const wx = hookX + Math.sin(nowD * 1.6 + j) * 4; // sway spójny z żyłką
-      // ramiona do założonych attachementów tego ciężarka (0=lewo, 1=prawo)
-      for (let side = 0; side < 2; side++) {
-        const it = sideItems[j * 2 + side]; if (!it) continue;
-        const ax = wx + (side ? armLen : -armLen);
-        ctx.strokeStyle = '#3a4654'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(ax, wy); ctx.stroke();
-        drawItemSpan(ctx, ITEMS[it.id], ax - aSize / 2, wy - aSize / 2, aSize, aSize);
-      }
-      // klamra-ciężarek na żyłce
-      ctx.save();
-      ctx.fillStyle = '#46535f'; ctx.strokeStyle = '#1b242e'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.ellipse(wx, wy, hookH * 0.11, hookH * 0.16, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = 'rgba(200,222,244,0.35)';
-      ctx.beginPath(); ctx.ellipse(wx - hookH * 0.035, wy - hookH * 0.05, hookH * 0.035, hookH * 0.06, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-  }
+  sideItems.forEach((it, i) => {
+    const aSize = hookH * 0.66, stepY = hookH * 0.62;
+    const side = i % 2 === 0 ? 1 : -1;                 // naprzemiennie: 1. prawo, 2. lewo...
+    const ay = eyeletY - hookH * 0.15 - i * stepY;     // stackowane w górę od oczka
+    const ax = hookX + side * aSize * 0.40 + Math.sin(nowD * 1.6 + i) * 3; // lekko z boku linii (sway)
+    ctx.save();
+    ctx.translate(ax, ay);
+    if (side < 0) ctx.scale(-1, 1);
+    drawItemSpan(ctx, ITEMS[it.id], -aSize / 2, -aSize / 2, aSize, aSize, false);
+    ctx.restore();
+  });
 
   // JEDEN widoczny hak wg tego co założone: kotwiczka > brąz > rusty (baza). Z kotwą+brązem → kotwa na brąz.
   const hasBronze = s.hook && s.hook.hasBronze, hasAnchor = s.hook && s.hook.hasAnchor;
