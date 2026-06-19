@@ -5,7 +5,7 @@ import { stepDescent } from '../src/sim.js';
 import { WORLD } from '../src/config.js';
 
 function started() {
-  // realny loadout: rusty hak (atk1) + brązowy hak obok (+7 = atk8) — jak po tutorialu
+  // realny loadout: rusty hak (atk1) + brązowy hak (+3 = atk4) — jak po tutorialu
   const s = createGame(); placeHook(s, 0, 0); placeAccessory(s, 'bronze'); startStage(s);
   return s;
 }

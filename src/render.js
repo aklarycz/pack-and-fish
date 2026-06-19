@@ -146,7 +146,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b64'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b65'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -198,17 +198,17 @@ function drawTutorial(ctx, s) {
   const invRect = (id) => { const it = s._bpInv && s._bpInv.find(e => e.id === id); return it ? it.rect : null; };
   if (s.mode === 'HOME') {
     const h = s._home; if (!h) return;
-    if (s.hook.atk < 8) { target = rectCenter(h.backpack); text = 'Otwórz plecak — wzmocnij hak (brązowy hak)'; }
+    if (s.hook.atk < 4) { target = rectCenter(h.backpack); text = 'Otwórz plecak — wzmocnij hak (brązowy hak)'; }
     else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { target = rectCenter(h.backpack); text = 'Masz Kotwicę! Otwórz plecak'; }
     else if (s.progress.pendingChests > 0 && !s.progress.gotAnchor && h.chest) { target = rectCenter(h.chest); text = 'Otwórz skrzynię!'; }
     else if (!s.progress.gotAnchor && s.progress.stages[0].stars === 0 && h.start) { target = rectCenter(h.start); text = 'Tap, by zarzucić wędkę'; }
   } else if (s.mode === 'BACKPACK') {
     const gi = s._grid;
-    if (s.hook.atk < 8) { // brązowy hak (start): wystarczy włożyć → +7 atk (raw, bez sąsiedztwa)
+    if (s.hook.atk < 4) { // brązowy hak (start): wystarczy włożyć → +3 atk (raw, bez sąsiedztwa)
       const r = invRect('bronze');
       if (r) { target = rectCenter(r); text = 'Tap, by włożyć Brązowy hak'; }
-    } else if (s.hook.atk >= 8 && !s.progress.gotAnchor && !s.progress.tutBronzeDone && s._backpackBack) {
-      target = rectCenter(s._backpackBack); text = 'Gotowe! +7 atk — Wróć na Home';
+    } else if (s.hook.atk >= 4 && !s.progress.gotAnchor && !s.progress.tutBronzeDone && s._backpackBack) {
+      target = rectCenter(s._backpackBack); text = 'Gotowe! +3 atk — Wróć na Home';
     } else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { // kotwica: +1 ryba TYLKO obok brązowego haka
       const r = invRect('anchor');
       if (r) { target = rectCenter(r); text = 'Tap, by włożyć Kotwicę'; }

@@ -18,7 +18,7 @@ export function defaultProgress(stageCount) {
     gotAnchor: false,    // czy pierwsza (wymuszona) Kotwica już przyznana
     gotRocket: false,    // czy druga (wymuszona) Wyrzutnia rakiet już przyznana
     tackleboxTier: 0,    // poziom tackleboxa (pojemność gridu) — rośnie z lepszym tackleboxem
-    inventory: { bronze: 1 }, // start: brązowy hak (z tutoriala) — +7 atk po połączeniu
+    inventory: { bronze: 1 }, // start: brązowy hak (z tutoriala) — +3 atk po włożeniu
     tutBronzeDone: false,     // czy tutorial zakładania brązowego haka zaliczony
     tutAnchorDone: false, // czy tutorial łączenia kotwicy zaliczony
   };

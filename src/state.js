@@ -98,7 +98,7 @@ export function closeBackpack(s) {
   if (s.mode !== 'BACKPACK') return;
   s.mode = 'HOME';
   let dirty = false;
-  if (s.hook && s.hook.atk >= 8 && !s.progress.tutBronzeDone) { s.progress.tutBronzeDone = true; dirty = true; }
+  if (s.hook && s.hook.atk >= 4 && !s.progress.tutBronzeDone) { s.progress.tutBronzeDone = true; dirty = true; }
   if (s.hook && s.hook.maxLatch >= 2 && !s.progress.tutAnchorDone) { s.progress.tutAnchorDone = true; dirty = true; }
   if (dirty) saveProgress(s.progress);
 }

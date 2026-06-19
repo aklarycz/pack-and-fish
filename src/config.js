@@ -51,10 +51,10 @@ export const STARTER_HOOK = {
 // pojemności, więc itemy wieloslotowe to wybór builda. `mount` = jak rysuje się na żyłce:
 // 'hook' (kotwica/brąz: terminalny hak na dole) lub 'side' (gadżet na ramieniu ciężarka).
 // Efekt połączenia (maxLatch/+ryba) liczy się TYLKO gdy akcesorium połączone (adjacency) z hakiem.
-// Brązowy hak — startowe akcesorium (z tutoriala): +7 atk (rusty 1 + brąz 7 = 8 → łowi bass/sum).
+// Brązowy hak — startowe akcesorium (z tutoriala): +3 atk (rusty 1 + brąz 3 = 4).
 export const BRONZE_HOOK = {
   id: 'bronze', name: 'Brązowy hak', kind: 'accessory', mount: 'hook', rarity: 'uncommon',
-  atk: 7, slots: 1, w: 1, h: 1, desc: '+7 atk (połącz z hakiem)',
+  atk: 3, slots: 1, w: 1, h: 1, desc: '+3 atk (na haku)',
 };
 // Kotwica — z 1. skrzyni: +1 jednoczesny zaczep oraz +1 atk.
 export const ANCHOR = {
@@ -110,9 +110,10 @@ export const FISH_TYPES = {
   // okna szersze (łapanie z zapasem, nie "na styk"); radius powiększany etapami (większe ryby, ostatnio +15%).
   // bass (mała): szybka, UCIEKA od haka; łatwa do złapania (niski hp)
   plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 37, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
-  // sum (średnia): wolniejszy, UCIEKA; łowialny bazowym brązem (atk8·okno3.6 = 28.8 dmg)
-  // przez cały stage — na ~40m hp = 20·1.24 ≈ 25, margines ~4 (komfortowo, nie "na styk")
-  sredniak:  { id: 'sredniak',  hp: 20, window: 3.6, speed: 72,  aggroRange: 150, radius: 63, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
+  // sum (średnia): wolniejszy, UCIEKA; okno 4.2 (z 3.6) — z atk5+rakietnicą łowialny od ~stage 3,
+  // na stage 1-2 (sam hak) wyzwanie (atk·okno < hp). NIEłowialny samym hakiem przy pełnym atk5 na dnie
+  // (5·4.2=21 < 20·1.3≈26) — celowa zależność od rakietnicy/upgrade'ów.
+  sredniak:  { id: 'sredniak',  hp: 20, window: 4.2, speed: 72,  aggroRange: 150, radius: 63, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
   // muskie (duża): ATAKUJE hak, NIE DO ZŁAPANIA bazowym sprzętem (8·2.4=19.2 ≪ 40; z kotwicą 9·2.4=21.6 ≪ 40)
   twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 99, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };
@@ -153,37 +154,59 @@ export const STARS = { t1: 80, t2: 200, t3: 380 };
 // po globalnym indeksie (stage N+1 odblokowuje się po ≥1★ na N, także przez granicę areny).
 export const STAGES_PER_ARENA = 10;
 
-// Progi gwiazdek jako UŁAMKI teoretycznego maxa worka (depthCap + Σ scoreValue·wStun).
-// 3★ ≈ 93% (złap prawie wszystko) — spójne i zawsze osiągalne, bez ręcznego strojenia.
-const STAR_FRAC = { t1: 0.58, t2: 0.79, t3: 0.93 };
+// Jawna kompozycja Areny 1 (przebalansowane przez game designera — patrz docs/balance-arena1.md):
+// p/s/m = plotka/sredniak/muskie (suma = total: 20,25,...,65). Muskie ramp ⌈stage/2⌉ (1,1,2,2,3,3,4,4,5,5)
+// — łagodniejszy niż dosłowne 1,3,5..., bo muskie są praktycznie niełowialne i 3 naraz = pewna strata żyć.
+const ARENA1_STAGES = [
+  { p: 15, s: 4,  m: 1, cap: 30, spawn: 2.30 },
+  { p: 18, s: 6,  m: 1, cap: 34, spawn: 2.20 },
+  { p: 20, s: 8,  m: 2, cap: 38, spawn: 2.10 },
+  { p: 23, s: 10, m: 2, cap: 42, spawn: 2.00 },
+  { p: 24, s: 13, m: 3, cap: 46, spawn: 1.90 },
+  { p: 25, s: 17, m: 3, cap: 50, spawn: 1.80 },
+  { p: 26, s: 20, m: 4, cap: 54, spawn: 1.75 },
+  { p: 27, s: 24, m: 4, cap: 58, spawn: 1.70 },
+  { p: 27, s: 28, m: 5, cap: 62, spawn: 1.65 },
+  { p: 27, s: 33, m: 5, cap: 66, spawn: 1.60 },
+];
 
-// Generuje 10 stage'y areny ze skalowanej bazy. muskie (twardziel) spawnuje się na KOŃCU worka
-// (głęboko) i LICZY się do maxScore — bazowym hakiem go nie złapiesz, więc na MAX punktów (3★)
-// trzeba ulepszeń (to celowa marchewka). Bare hookiem da się wyczyścić i zrobić ~2★.
-// UWAGA: balans stage'y 2-10 jest heurystyczny — stage 1 trzyma sprawdzone liczby.
-function buildArenaStages(base, arena) {
+// Progi gwiazdek wg REALNIE osiągalnego score per epoka sprzętu (nie % teoretycznego maxa).
+// Naprawia "2 ostatnie ryby = 2 gwiazdki": T1 osiągalny plotką wszędzie, T2 wymaga sumów (rakietnica
+// od stage 3 globalnie), T3 zawsze wymaga ulepszeń (muskie). hasRocket = gracz ma już rakietnicę.
+function starThresholds(p, s, m, cap, hasRocket) {
+  const P = p * 10, S = s * 30, M = m * 60, D = cap;
+  return {
+    t1: Math.round(D + 0.55 * P),
+    t2: Math.round(D + 0.90 * P + (hasRocket ? 0.70 * S : 0)),
+    t3: Math.round(D + P + S + 0.50 * M),
+  };
+}
+
+// Generuje 10 stage'y areny. Arena 1 = jawna tabela (designer); areny 2-3 = heurystyka ze skalowanej bazy.
+// Rakietnica dostępna od stage'a globalnego 3 (index 2) — po skrzyni za stage 2.
+function buildArenaStages(base, arena, arenaIndex) {
   const stages = [];
   for (let i = 0; i < STAGES_PER_ARENA; i++) {
-    const mult = 1 + i * 0.10;
-    const plotka = Math.round(base.plotka * mult);
-    const sredniak = Math.round(base.sredniak * mult);
-    // muskie (hazard) pojawia się od stage'a `muskieFrom` w danej arenie (w arenie 1 dopiero od 2.)
-    const muskie = i < base.muskieFrom ? 0 : base.muskie + Math.floor((i - base.muskieFrom) * 0.3);
+    const globalIndex = arenaIndex * STAGES_PER_ARENA + i;
+    const hasRocket = globalIndex >= 2;
+    let plotka, sredniak, muskie, depthCap, start;
+    if (arenaIndex === 0) {
+      const c = ARENA1_STAGES[i];
+      plotka = c.p; sredniak = c.s; muskie = c.m; depthCap = c.cap; start = c.spawn;
+    } else {
+      const mult = 1 + i * 0.10;
+      plotka = Math.round(base.plotka * mult);
+      sredniak = Math.round(base.sredniak * mult);
+      muskie = i < base.muskieFrom ? 0 : base.muskie + Math.floor((i - base.muskieFrom) * 0.3);
+      depthCap = base.depthCap + i * 2;
+      start = Math.max(base.spawnMin, base.spawnStart - i * 0.05);
+    }
     const bag = { plotka, sredniak, twardziel: muskie };
     const difficultyOffsetM = base.offsetM + i * 2;
-    const depthCap = base.depthCap + i * 2;
-    const start = Math.max(base.spawnMin, base.spawnStart - i * 0.05);
-    const maxScore = depthCap + // muskie WLICZONY — max wymaga ulepszeń (bare hook go nie ubije)
-      (plotka * FISH_TYPES.plotka.scoreValue + sredniak * FISH_TYPES.sredniak.scoreValue
-        + muskie * FISH_TYPES.twardziel.scoreValue) * SCORE.wStun;
     stages.push({
       arenaId: arena.id, arenaName: arena.name, bg: arena.bg, no: i + 1,
       difficultyOffsetM, bag, spawn: { start, min: start, perM: base.perM }, depthCap,
-      stars: {
-        t1: Math.round(maxScore * STAR_FRAC.t1),
-        t2: Math.round(maxScore * STAR_FRAC.t2),
-        t3: Math.round(maxScore * STAR_FRAC.t3),
-      },
+      stars: starThresholds(plotka, sredniak, muskie, depthCap, hasRocket),
     });
   }
   return stages;
@@ -202,7 +225,7 @@ export const ARENAS = [
 export const ARENA_COUNT = ARENAS.length;
 
 // Płaska lista wszystkich stage'y (index globalny = arena*10 + lokalny).
-export const STAGES = ARENAS.flatMap(a => buildArenaStages(a.base, a));
+export const STAGES = ARENAS.flatMap((a, idx) => buildArenaStages(a.base, a, idx));
 
 // Pomocniki mapowania global<->arena/lokalny.
 export function arenaOf(globalIndex) { return Math.floor(globalIndex / STAGES_PER_ARENA); }
