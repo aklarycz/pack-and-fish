@@ -144,7 +144,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b50'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b51'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -176,10 +176,9 @@ function tutCellRect(gi, idx) {
   const c = idx % BACKPACK.cols, r = Math.floor(idx / BACKPACK.cols);
   return { x: gi.ox + c * gi.cell, y: gi.oy + r * gi.cell, w: gi.cell, h: gi.cell };
 }
-function freeAdjacentToHook(grid) {
+function freeAdjacentToHook(grid) { // „hak" do połączenia = brązowy hak (akcesorium)
   const { cells, cols, rows } = grid;
-  let hi = -1;
-  for (let i = 0; i < cells.length; i++) { const it = cells[i] && ITEMS[cells[i]]; if (it && it.kind === 'hook') { hi = i; break; } }
+  let hi = cells.indexOf('bronze');
   if (hi < 0) return -1;
   const r = Math.floor(hi / cols), c = hi % cols, nb = [];
   if (r > 0) nb.push(hi - cols); if (r < rows - 1) nb.push(hi + cols);
@@ -197,32 +196,26 @@ function drawTutorial(ctx, s) {
   const invRect = (id) => { const it = s._bpInv && s._bpInv.find(e => e.id === id); return it ? it.rect : null; };
   if (s.mode === 'HOME') {
     const h = s._home; if (!h) return;
-    if (!s.hook) { target = rectCenter(h.backpack); text = 'Otwórz plecak — załóż hak'; }
-    else if (s.hook.atk < 8) { target = rectCenter(h.backpack); text = 'Otwórz plecak — wzmocnij hak'; }
+    if (s.hook.atk < 8) { target = rectCenter(h.backpack); text = 'Otwórz plecak — wzmocnij hak (brązowy hak)'; }
     else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { target = rectCenter(h.backpack); text = 'Masz Kotwicę! Otwórz plecak'; }
     else if (s.progress.pendingChests > 0 && !s.progress.gotAnchor && h.chest) { target = rectCenter(h.chest); text = 'Otwórz skrzynię!'; }
     else if (!s.progress.gotAnchor && s.progress.stages[0].stars === 0 && h.start) { target = rectCenter(h.start); text = 'Tap, by zarzucić wędkę'; }
   } else if (s.mode === 'BACKPACK') {
     const gi = s._grid;
-    if (!s.hook && gi) { target = rectCenter(tutCellRect(gi, 4)); text = 'Tap pole, by włożyć hak'; }
-    else if (s.hook && s.hook.atk < 8) { // brązowy hak (start): włóż i połącz → +7 atk
+    if (s.hook.atk < 8) { // brązowy hak (start): wystarczy włożyć → +7 atk (raw, bez sąsiedztwa)
       const r = invRect('bronze');
       if (r) { target = rectCenter(r); text = 'Tap, by włożyć Brązowy hak'; }
-      else if (gi) {
-        const bi = s.grid.cells.indexOf('bronze'), adj = freeAdjacentToHook(s.grid);
-        if (bi >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, bi)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Brązowy hak obok haka'; }
-      }
-    } else if (s.hook && s.hook.atk >= 8 && !s.progress.gotAnchor && !s.progress.tutBronzeDone && s._backpackBack) {
-      target = rectCenter(s._backpackBack); text = 'Połączone! +7 atk — Wróć na Home';
-    } else if (s.hook && s.progress.gotAnchor && s.hook.maxLatch < 2) {
+    } else if (s.hook.atk >= 8 && !s.progress.gotAnchor && !s.progress.tutBronzeDone && s._backpackBack) {
+      target = rectCenter(s._backpackBack); text = 'Gotowe! +7 atk — Wróć na Home';
+    } else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { // kotwica: +1 ryba TYLKO obok brązowego haka
       const r = invRect('anchor');
       if (r) { target = rectCenter(r); text = 'Tap, by włożyć Kotwicę'; }
       else if (gi) {
         const ai = s.grid.cells.indexOf('anchor'), adj = freeAdjacentToHook(s.grid);
-        if (ai >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, ai)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Kotwicę obok haka'; }
+        if (ai >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, ai)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Kotwicę obok Brązowego haka'; }
       }
-    } else if (s.hook && s.hook.maxLatch >= 2 && s.progress.gotAnchor && !s.progress.tutAnchorDone && s._backpackBack) {
-      target = rectCenter(s._backpackBack); text = 'Połączone! +1 ryba, +1 atk — Wróć na Home';
+    } else if (s.hook.maxLatch >= 2 && s.progress.gotAnchor && !s.progress.tutAnchorDone && s._backpackBack) {
+      target = rectCenter(s._backpackBack); text = 'Połączone! +1 ryba naraz — Wróć na Home';
     }
   }
   if (!text) return;
@@ -707,18 +700,6 @@ function drawItemCell(ctx, it, x, y, cell) {
   }
 }
 
-// Slot bazy haka w plecaku — NIE kolekcjonowalny item, tylko subtelny wskaźnik „tu jest hak,
-// dołącz akcesoria obok". Sam zardzewiały hak widać dopiero na żyłce w grze (gdy brak hook-akcesoriów).
-function drawHookSlot(ctx, x, y, cell) {
-  // baza haka — NEUTRALNY slot (kreskowany + pierścień zaczepu), bez wizualu zardzewiałego haka.
-  // Sam hak widać dopiero na żyłce w grze (gdy brak hook-akcesoriów).
-  fillRR(ctx, x + cell * 0.12, y + cell * 0.12, cell * 0.76, cell * 0.76, 6, 'rgba(120,150,180,0.08)');
-  ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(160,190,220,0.4)'; ctx.lineWidth = 1.5;
-  rrPath(ctx, x + cell * 0.12, y + cell * 0.12, cell * 0.76, cell * 0.76, 6); ctx.stroke(); ctx.setLineDash([]);
-  ctx.strokeStyle = 'rgba(180,205,230,0.5)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(x + cell / 2, y + cell / 2, cell * 0.13, 0, Math.PI * 2); ctx.stroke(); // pierścień = punkt zaczepu
-}
-
 function renderBackpack(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
   ctx.fillStyle = '#0a2236'; ctx.fillRect(0, 0, W, H);
@@ -734,12 +715,8 @@ function renderBackpack(ctx, s) {
     const idx = r * BACKPACK.cols + c;
     const id = s.grid.cells[idx];
     if (id && ITEMS[id] && !(s.bpDrag && s.bpDrag.fromIdx === idx)) {
-      if (ITEMS[id].kind === 'hook') {
-        drawHookSlot(ctx, cellX, cellY, bcell); // baza (zardzewiały hak) — subtelny slot, nie item
-      } else {
-        drawItemCell(ctx, ITEMS[id], cellX, cellY, bcell);
-        if (s.bpSelected && s.bpSelected.gridIdx === idx) { rrPath(ctx, cellX, cellY, bcell, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke(); }
-      }
+      drawItemCell(ctx, ITEMS[id], cellX, cellY, bcell); // grid trzyma tylko akcesoria
+      if (s.bpSelected && s.bpSelected.gridIdx === idx) { rrPath(ctx, cellX, cellY, bcell, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke(); }
     }
   }
   s._grid = { ox, oy, cell: bcell };
@@ -749,7 +726,7 @@ function renderBackpack(ctx, s) {
     ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`; ctx.textAlign = 'center';
     ctx.fillText(`Hak: ${s.hook.atk} atk · łapie ${s.hook.maxLatch} naraz`, W / 2, oy + gh + H * 0.04);
     ctx.fillStyle = 'rgba(207,226,245,0.6)'; ctx.font = `${Math.round(H * 0.017)}px sans-serif`;
-    ctx.fillText('Przeciągnij itemy — połącz Kotwicę z hakiem', W / 2, oy + gh + H * 0.065);
+    ctx.fillText('Połącz Kotwicę z Brązowym hakiem (obok) — wtedy +1 ryba', W / 2, oy + gh + H * 0.065);
   }
 
   let y = oy + gh + H * 0.10;
@@ -792,7 +769,10 @@ function renderBackpack(ctx, s) {
     ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.02)}px sans-serif`;
     ctx.fillText(stats.join('   ·   '), W / 2, py + H * 0.058);
     ctx.fillStyle = 'rgba(207,226,245,0.75)'; ctx.font = `${Math.round(H * 0.017)}px sans-serif`;
-    ctx.fillText('Odblokowuje się po połączeniu z hakiem (obok)', W / 2, py + H * 0.082);
+    const note = it.id === 'bronze' ? 'Daje +atk od razu po włożeniu'
+      : it.maxLatch ? '+1 ryba działa po połączeniu z Brązowym hakiem (obok)'
+      : 'Daje raw +atk po włożeniu';
+    ctx.fillText(note, W / 2, py + H * 0.082);
     const bw2 = W * 0.42, bh2 = H * 0.045, bx2 = W / 2 - bw2 / 2, by2 = py + ph - bh2 - H * 0.012;
     if (placed && it.kind !== 'hook') {
       roundedBtn(ctx, { x: bx2, y: by2, w: bw2, h: bh2 }, '#9a4b4b', 'WYPNIJ');
@@ -907,15 +887,14 @@ function renderDescent(ctx, s, hookX, hookY) {
     hookX - drag * 1.9 + sway * 0.6, eyeletY * 0.72,
     hookX, eyeletY);                               // żyłka kończy się na OCZKU haka
   ctx.stroke(); ctx.lineCap = 'butt';
-  // JEDEN widoczny hak wg priorytetu: kotwiczka > brąz > rusty. Z kotwą+brązem → kotwa przekolorowana na brąz.
-  const bronzeOn = s.hook && s.hook.atk >= 8;
-  const trebleOn = s.hook && s.hook.maxLatch >= 2;
-  const hookSrc = trebleOn ? ITEM_SPRITE.anchor : bronzeOn ? ITEM_SPRITE.bronze : ITEM_SPRITE.rusty_hook;
+  // JEDEN widoczny hak wg tego co założone: kotwiczka > brąz > rusty (baza). Z kotwą+brązem → kotwa na brąz.
+  const hasBronze = s.hook && s.hook.hasBronze, hasAnchor = s.hook && s.hook.hasAnchor;
+  const hookSrc = hasAnchor ? ITEM_SPRITE.anchor : hasBronze ? ITEM_SPRITE.bronze : ITEM_SPRITE.rusty_hook;
   const him = keyedEdge(hookSrc);
   if (him) {
     const hw = hookH * (him.naturalWidth || him.width) / (him.naturalHeight || him.height);
     const dx = hookX - hw / 2, dy = hookY - hookH; // ostrze (dół) na hookY, oczko u góry
-    if (trebleOn && bronzeOn && 'filter' in ctx) ctx.filter = 'sepia(0.85) saturate(2.2) brightness(1.05)'; // kotwa → brąz
+    if (hasAnchor && hasBronze && 'filter' in ctx) ctx.filter = 'sepia(0.85) saturate(2.2) brightness(1.05)'; // kotwa → brąz
     ctx.drawImage(him, dx, dy, hw, hookH);
     ctx.filter = 'none';
   } else { ctx.fillStyle = '#dfe9f5'; ctx.beginPath(); ctx.arc(hookX, hookY, 8, 0, Math.PI * 2); ctx.fill(); }

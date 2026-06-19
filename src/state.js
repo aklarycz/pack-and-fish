@@ -3,42 +3,33 @@ import { createGrid, placeItem } from './logic/backpack.js';
 import { computeScore, computeStars } from './logic/scoring.js';
 import { loadProgress, saveProgress } from './persistence.js';
 
-// Staty haka = hak bazowy + akcesoria POŁĄCZONE z hakiem (adjacency: spójny
-// komponent ortogonalny zawierający hak). Akcesoria odłączone NIE dają efektu.
-// null = brak haka w plecaku.
+// Staty haka. Zardzewiały hak NIE jest itemem — to bazowe staty gracza (zawsze coś wisi na lince).
+// Grid trzyma TYLKO akcesoria. RAW atk dolicza KAŻDE położone akcesorium (niezależnie od ułożenia).
+// Bonusy "połączenia" (maxLatch / +ryba) liczą się tylko dla akcesoriów POŁĄCZONYCH (adjacency)
+// z brązowym hakiem — czyli kotwica musi sąsiadować z brązowym hakiem, by dać +1 zacięcie.
+// Zwraca ZAWSZE staty (nigdy null). hasBronze/hasAnchor = co jest położone (do wizualu).
 export function computeHookStats(grid) {
   const { cells, cols, rows } = grid;
-  let hookIdx = -1;
+  let atk = STARTER_HOOK.atk, maxLatch = STARTER_HOOK.maxLatch;
+  let bronzeIdx = -1, hasBronze = false, hasAnchor = false;
   for (let i = 0; i < cells.length; i++) {
     const it = cells[i] && ITEMS[cells[i]];
-    if (it && it.kind === 'hook') { hookIdx = i; break; }
+    if (!it || it.kind !== 'accessory') continue;
+    atk += it.atk || 0;                    // raw atk — zawsze
+    if (it.id === 'bronze') { bronzeIdx = i; hasBronze = true; }
+    if (it.id === 'anchor') hasAnchor = true;
   }
-  if (hookIdx < 0) return null;
-  // flood-fill po zajętych, ortogonalnie sąsiednich polach od haka
-  const seen = new Set([hookIdx]); const stack = [hookIdx];
-  while (stack.length) {
-    const idx = stack.pop(), r = Math.floor(idx / cols), c = idx % cols;
-    const nb = [];
-    if (r > 0) nb.push(idx - cols);
-    if (r < rows - 1) nb.push(idx + cols);
-    if (c > 0) nb.push(idx - 1);
-    if (c < cols - 1) nb.push(idx + 1);
-    for (const n of nb) if (!seen.has(n) && cells[n]) { seen.add(n); stack.push(n); }
+  if (bronzeIdx >= 0) { // komponent spójny zawierający brązowy hak → te akcesoria dają bonus latch
+    const seen = new Set([bronzeIdx]), stack = [bronzeIdx];
+    while (stack.length) {
+      const idx = stack.pop(), r = Math.floor(idx / cols), c = idx % cols, nb = [];
+      if (r > 0) nb.push(idx - cols); if (r < rows - 1) nb.push(idx + cols);
+      if (c > 0) nb.push(idx - 1); if (c < cols - 1) nb.push(idx + 1);
+      for (const n of nb) { const it = cells[n] && ITEMS[cells[n]]; if (it && it.kind === 'accessory' && !seen.has(n)) { seen.add(n); stack.push(n); } }
+    }
+    for (const idx of seen) { const it = ITEMS[cells[idx]]; if (it) maxLatch += it.maxLatch || 0; }
   }
-  const hook = ITEMS[cells[hookIdx]];
-  const stats = {
-    atk: hook.atk, zwrotnosc: hook.zwrotnosc,
-    szybkoscOpadania: hook.szybkoscOpadania, maxLatch: hook.maxLatch,
-  };
-  for (const idx of seen) {
-    if (idx === hookIdx) continue;
-    const it = ITEMS[cells[idx]]; if (!it) continue;
-    stats.atk += it.atk || 0;
-    stats.zwrotnosc += it.zwrotnosc || 0;
-    stats.szybkoscOpadania += it.szybkoscOpadania || 0;
-    stats.maxLatch += it.maxLatch || 0;
-  }
-  return stats;
+  return { atk, maxLatch, zwrotnosc: STARTER_HOOK.zwrotnosc, szybkoscOpadania: STARTER_HOOK.szybkoscOpadania, hasBronze, hasAnchor };
 }
 
 export function createGame() {

@@ -82,21 +82,23 @@ test('chest earned only on clear with >=1 star; first chest forces the anchor', 
   assert.equal(s.progress.pendingChests, 0);
 });
 
-test('placing the anchor (adjacent) raises hook maxLatch to 2', () => {
-  const s = createGame(); placeHook(s, 0, 0);
+test('anchor connected to bronze hook raises maxLatch to 2', () => {
+  const s = createGame();                          // bronze in inventory
+  placeAccessory(s, 'bronze');                     // index 0
   s.progress.inventory.anchor = 1;
-  assert.equal(placeAccessory(s, 'anchor'), true); // auto first free = index 1, adjacent
-  assert.equal(s.hook.maxLatch, 2);
+  assert.equal(placeAccessory(s, 'anchor'), true); // auto first free = index 1, adjacent to bronze
+  assert.equal(s.hook.maxLatch, 2);                // połączone → +1 ryba
 });
 
-test('accessory gives effect only when connected to hook (adjacency)', () => {
-  const s = createGame(); placeHook(s, 0, 0); // hook at index 0
-  s.grid.cells[8] = 'anchor'; s.hook = computeHookStats(s.grid); // far corner, not connected
-  assert.equal(s.hook.maxLatch, 1);
-  assert.equal(s.hook.atk, STARTER_HOOK.atk);
-  moveItem(s, 8, 1);                                              // connect to hook
-  assert.equal(s.hook.maxLatch, 2);
-  assert.equal(s.hook.atk, STARTER_HOOK.atk + 1);                 // anchor +1 atk when connected
+test('raw atk always counts; +fish (maxLatch) only when anchor connected to bronze hook', () => {
+  const s = createGame();
+  s.grid.cells[0] = 'bronze'; s.grid.cells[8] = 'anchor'; // bronze i kotwica DALEKO (niepołączone)
+  s.hook = computeHookStats(s.grid);
+  assert.equal(s.hook.atk, STARTER_HOOK.atk + 7 + 1); // raw atk: baza1 + brąz7 + kotwica1 = 9 (zawsze)
+  assert.equal(s.hook.maxLatch, 1);                   // niepołączone → brak +ryba
+  moveItem(s, 8, 1);                                  // kotwica obok brązowego haka
+  assert.equal(s.hook.maxLatch, 2);                   // połączone → +1 ryba
+  assert.equal(s.hook.atk, STARTER_HOOK.atk + 7 + 1); // atk bez zmian (raw)
 });
 
 test('fish award coins from their coins field', () => {
