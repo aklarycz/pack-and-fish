@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b66'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b67'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -196,12 +196,16 @@ function renderSplash(ctx, s) {
     ctx.fillStyle = '#bfe3ff'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`;
     ctx.fillText('Zarzuć, złów, ulepszaj', W / 2, H * 0.215);
   }
-  // przycisk Guest
-  const bw = W * 0.62, bh = H * 0.078, bx = W / 2 - bw / 2, by = H * 0.82;
-  roundedBtn(ctx, { x: bx, y: by, w: bw, h: bh }, '#2e7d4f', 'GRAJ JAKO GOŚĆ');
-  s._splashBtn = { x: bx, y: by, w: bw, h: bh };
-  ctx.fillStyle = 'rgba(207,226,245,0.5)'; ctx.textAlign = 'center'; ctx.font = `${Math.round(H * 0.016)}px sans-serif`;
-  ctx.fillText('Logowanie kontem — wkrótce', W / 2, by + bh + H * 0.03);
+  // 3 przyciski logowania (domyślny układ). AKTYWNY tylko Gość; Google/Apple = placeholdery ("wkrótce").
+  const bw = W * 0.66, bh = H * 0.07, bx = W / 2 - bw / 2, by1 = H * 0.785;
+  roundedBtn(ctx, { x: bx, y: by1, w: bw, h: bh }, '#2e7d4f', 'GRAJ JAKO GOŚĆ');
+  s._splashBtn = { x: bx, y: by1, w: bw, h: bh };
+  // 2 loginy społecznościowe (nieaktywne, wyszarzone)
+  const gap = W * 0.03, sw = (bw - gap) / 2, sy = by1 + bh + H * 0.016;
+  roundedBtn(ctx, { x: bx, y: sy, w: sw, h: bh }, '#39485a', 'Google');
+  roundedBtn(ctx, { x: bx + sw + gap, y: sy, w: sw, h: bh }, '#39485a', 'Apple');
+  ctx.fillStyle = 'rgba(207,226,245,0.45)'; ctx.textAlign = 'center'; ctx.font = `${Math.round(H * 0.014)}px sans-serif`;
+  ctx.fillText('Logowanie kontem — wkrótce', W / 2, sy + bh + H * 0.022);
   ctx.textAlign = 'left';
 }
 
