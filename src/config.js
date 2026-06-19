@@ -90,9 +90,9 @@ export const FISH_TYPES = {
   // okna szersze (łapanie z zapasem, nie "na styk"); radius powiększany etapami (większe ryby, ostatnio +15%).
   // bass (mała): szybka, UCIEKA od haka; łatwa do złapania (niski hp)
   plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 37, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
-  // sum (średnia): wolniejszy, UCIEKA; hp tak dobrane, by bazowy hak (atk8) ledwie zdążył (na styk):
-  // 8·3.4=27.2 dmg; przy głębi stage'a hp rośnie ~×1.36 → 20·1.36≈27 = na styk
-  sredniak:  { id: 'sredniak',  hp: 20, window: 3.4, speed: 72,  aggroRange: 150, radius: 63, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
+  // sum (średnia): wolniejszy, UCIEKA; łowialny bazowym brązem (atk8·okno3.6 = 28.8 dmg)
+  // przez cały stage — na ~40m hp = 20·1.24 ≈ 25, margines ~4 (komfortowo, nie "na styk")
+  sredniak:  { id: 'sredniak',  hp: 20, window: 3.6, speed: 72,  aggroRange: 150, radius: 63, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
   // muskie (duża): ATAKUJE hak, NIE DO ZŁAPANIA bazowym sprzętem (8·2.4=19.2 ≪ 40; z kotwicą 9·2.4=21.6 ≪ 40)
   twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 99, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };
@@ -102,7 +102,9 @@ export const RAMP = {
   baseSpawnInterval: 1.4,   // s między spawnami na starcie
   minSpawnInterval: 0.45,   // sufit gęstości
   spawnTightenPerM: 0.004,  // o ile skraca się interwał na metr
-  hpMulPerM: 0.012,         // wzrost HP na metr (mnożnik narasta liniowo od 1)
+  hpMulPerM: 0.006,         // wzrost HP na metr (zmniejszone z 0.012 — sumy były niełowialne
+                            // pod koniec stage'a: na ~40m ×1.46 dawało hp 29 > atk8·okno 27.2.
+                            // Teraz ×1.24 → hp ~25, łowialne gołym brązem przez cały stage)
   speedMulPerM: 0.006,
   // miks archetypów: udział twardzieli/średniaków rośnie z głębokością
   mix: [
