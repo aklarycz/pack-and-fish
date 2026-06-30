@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b80'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b81'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -171,7 +171,49 @@ export function render(ctx, s, hookX, hookY) {
   if (s.mode === 'HOME') { renderHome(ctx, s); drawTutorial(ctx, s); return; }
   if (s.mode === 'BACKPACK') { renderBackpack(ctx, s); drawTutorial(ctx, s); return; }
   renderDescent(ctx, s, hookX, hookY);
-  if (s.mode === 'END') renderEnd(ctx, s);
+  if (s.mode === 'END') {
+    const fail = !(s.lastResult && s.lastResult.cleared);
+    if (fail && (s.endElapsed || 0) < END_HOLD) drawEndFlash(ctx, s); // beat: "ZERWANA ŻYŁKA!" zanim podsumowanie
+    else renderEnd(ctx, s);
+  }
+}
+
+const END_HOLD = 2.4; // s beatu po przegranej zanim pokaże się podsumowanie (gracz widzi co się stało)
+function drawEndFlash(ctx, s) {
+  const W = WORLD.W, H = WORLD.H;
+  ctx.fillStyle = 'rgba(3,12,20,0.3)'; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  const a = 0.55 + 0.45 * Math.sin((s.endElapsed || 0) * 6); // pulsuje
+  ctx.fillStyle = `rgba(255,120,120,${a.toFixed(2)})`;
+  ctx.font = `bold ${Math.round(H * 0.05)}px sans-serif`;
+  ctx.fillText('ZERWANA ŻYŁKA!', W / 2, H * 0.46);
+  ctx.fillStyle = 'rgba(207,226,245,0.8)'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`;
+  ctx.fillText('Wszystkie serca stracone', W / 2, H * 0.51);
+  ctx.textAlign = 'left';
+}
+
+// Wskaźniki PRZY HAKU: durability jako łuk po LEWEJ + serca na zewnętrznym łuku.
+// Prawa strona zarezerwowana pod przyszłą tarczę (dla równowagi).
+function drawHookGauge(ctx, hx, hy, s) {
+  const hookH = WORLD.H * 0.085;
+  const cx = hx, cy = hy - hookH * 0.35, R = hookH * 1.35;
+  const a0 = Math.PI * 0.70, a1 = Math.PI * 1.30;        // lewy łuk
+  const frac = s.durabilityMax > 0 ? Math.max(0, Math.min(1, s.durability / s.durabilityMax)) : 1;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(6,16,26,0.6)'; ctx.lineWidth = hookH * 0.17;
+  ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1); ctx.stroke();
+  const col = frac > 0.5 ? '#5fd56f' : frac > 0.25 ? '#ecc24a' : '#ec5a5a';
+  if (frac > 0) { ctx.strokeStyle = col; ctx.lineWidth = hookH * 0.12; ctx.beginPath(); ctx.arc(cx, cy, R, a0, a0 + (a1 - a0) * frac); ctx.stroke(); }
+  ctx.lineCap = 'butt';
+  // serca na łuku tuż na zewnątrz durability (lewa-góra)
+  const hr = R + hookH * 0.36;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `${Math.round(hookH * 0.34)}px sans-serif`;
+  for (let i = 0; i < 3; i++) {
+    const ang = Math.PI * 0.83 + i * Math.PI * 0.12;
+    ctx.fillStyle = i < s.lives ? '#ff6b8a' : 'rgba(120,140,160,0.45)';
+    ctx.fillText('❤', cx + Math.cos(ang) * hr, cy + Math.sin(ang) * hr);
+  }
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
 }
 
 // === SPLASH / LOGIN (Guest) — overlay startowy. Art: pędzący Tofu (splash.png) + logo (logo.png) ===
@@ -1107,14 +1149,15 @@ function renderDescent(ctx, s, hookX, hookY) {
     ctx.filter = 'none';
   } else { ctx.fillStyle = '#dfe9f5'; ctx.beginPath(); ctx.arc(hookX, hookY, 8, 0, Math.PI * 2); ctx.fill(); }
 
+  // wskaźniki PRZY HAKU: durability (lewy łuk) + serca — żeby gracz je widział w akcji
+  drawHookGauge(ctx, hookX, hookY, s);
+
   // top bar (HUD) na wierzchu — hak/ryby pod niego nie wchodzą
   ctx.fillStyle = 'rgba(4,18,31,0.9)'; ctx.fillRect(0, 0, WORLD.W, WORLD.topBarH);
   ctx.strokeStyle = 'rgba(127,209,255,0.25)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, WORLD.topBarH + 0.5); ctx.lineTo(WORLD.W, WORLD.topBarH + 0.5); ctx.stroke();
   const baseY = Math.round(WORLD.topBarH / 2) + 6;
-  // życia (lewo)
-  ctx.fillStyle = '#ff6b8a'; ctx.font = '20px sans-serif'; ctx.textAlign = 'left';
-  ctx.fillText('❤'.repeat(s.lives), 12, baseY);
+  // (życia przeniesione PRZY HAK — drawHookGauge)
   // głębia (prawo)
   ctx.fillStyle = '#9fd0ff'; ctx.font = '16px sans-serif'; ctx.textAlign = 'right';
   ctx.fillText(Math.round(s.depthPx / WORLD.pxPerMeter) + ' m', WORLD.W - 12, baseY);
@@ -1127,17 +1170,6 @@ function renderDescent(ctx, s, hookX, hookY) {
   const starsX0 = scoreRight + 12;
   for (let k = 0; k < 3; k++) star(ctx, starsX0 + sgap * (k + 0.5), baseY - 6, starR, k < liveStars);
   ctx.textAlign = 'left';
-  // pasek WYTRZYMAŁOŚCI haka (pod top barem, lewo) — zielony→żółty→czerwony w miarę zdzierania
-  if (s.durabilityMax > 0) {
-    const dw = WORLD.W * 0.34, dh = Math.max(6, WORLD.H * 0.011), dx = 12, dy = WORLD.topBarH + 7;
-    const frac = Math.max(0, Math.min(1, s.durability / s.durabilityMax));
-    fillRR(ctx, dx, dy, dw, dh, dh / 2, 'rgba(8,20,30,0.7)');
-    const col = frac > 0.5 ? '#6fd86f' : frac > 0.25 ? '#e8c24a' : '#e85a5a';
-    if (frac > 0) fillRR(ctx, dx, dy, dw * frac, dh, dh / 2, col);
-    ctx.fillStyle = 'rgba(207,226,245,0.85)'; ctx.font = `bold ${Math.round(WORLD.topBarH * 0.26)}px sans-serif`; ctx.textAlign = 'left';
-    ctx.fillText('HAK', dx + dw + 8, dy + dh);
-    ctx.textAlign = 'left';
-  }
 
   // kurtyna reveal: krzaki trzymają ZAKRYTE (HOLD, "loading"), potem rozjeżdżają się (OPEN)
   if (s.reveal) {

@@ -65,7 +65,7 @@ export function createGame() {
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [], endless: false,
     rockets: [], rocketCd: 0, rocketTarget: null, // wyrzutnia: pociski + cooldown + ZABLOKOWANY cel
-    durability: 0, durabilityMax: 0, clearTimer: 0, // pasek wytrzymałości + opóźnienie końca stage'a
+    durability: 0, durabilityMax: 0, clearTimer: 0, endElapsed: 0, // pasek + opóźnienia końca
     lastResult: null,
   };
 }
@@ -257,6 +257,7 @@ export function registerEscape(s) {
 
 function finishDescent(s, reason = 'fail') {
   s.mode = 'END';
+  s.endElapsed = 0;        // beat przed podsumowaniem (render czeka END_HOLD przy przegranej)
   recompute(s);
   const st = s.progress.stages[s.stageIndex];
   const prevStars = st.stars;

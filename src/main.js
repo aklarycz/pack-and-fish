@@ -73,7 +73,7 @@ attachInput(canvas, {
         for (const it of s._bpInv) if (hit(it.rect, x, y)) { selectAccessory(s, it.id); break; } // klik = opis
       }
     } else if (s.mode === 'END') {
-      returnHome(s);
+      if ((s.endElapsed || 0) >= 0.6) returnHome(s); // krótka blokada, by nie przeskoczyć beatu tapem
     } else if (s.mode === 'DESCENT') {
       hookTX = clampHookX(x); hookTY = clampHookY(y); // ustaw cel; hak nadąża z limitem prędkości
     }
@@ -110,6 +110,7 @@ function loop(ts) {
     hookX += Math.max(-mx, Math.min(mx, hookTX - hookX));
     hookY += Math.max(-mx, Math.min(mx, hookTY - hookY));
   }
+  if (s.mode === 'END') s.endElapsed = (s.endElapsed || 0) + dt; // beat przed pokazaniem podsumowania
   stepDescent(s, hookX, hookY, dt);
   render(ctx, s, hookX, hookY);
   requestAnimationFrame(loop);
