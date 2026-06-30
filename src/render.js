@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b83'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b84'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -1272,7 +1272,7 @@ function renderEnd(ctx, s) {
   // status: wyczyszczone vs fail
   const cleared = s.lastResult && s.lastResult.cleared;
   ctx.fillStyle = cleared ? '#7fffa1' : '#ff9a9a'; ctx.font = `bold ${Math.round(H * 0.034)}px sans-serif`;
-  ctx.fillText(cleared ? 'Łowisko wyczyszczone!' : 'Ryby uciekły!', cx, H * 0.35);
+  ctx.fillText(cleared ? 'Łowisko wyczyszczone!' : 'Zerwana żyłka!', cx, H * 0.35);
   // gwiazdki (wektorowe)
   const sr = H * 0.035, sg = sr * 2.6;
   for (let k = 0; k < 3; k++) star(ctx, cx - sg + k * sg, H * 0.43, sr * (k === 1 ? 1.1 : 1), k < s.stars);
