@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b81'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b82'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -197,6 +197,8 @@ function drawEndFlash(ctx, s) {
 function drawHookGauge(ctx, hx, hy, s) {
   const hookH = WORLD.H * 0.085;
   const cx = hx, cy = hy - hookH * 0.35, R = hookH * 1.35;
+  ctx.save();
+  ctx.globalAlpha = s.durDraining ? 0.8 : 0.5; // dyskretny w spoczynku, mocniejszy gdy pasek spada
   const a0 = Math.PI * 0.70, a1 = Math.PI * 1.30;        // lewy łuk
   const frac = s.durabilityMax > 0 ? Math.max(0, Math.min(1, s.durability / s.durabilityMax)) : 1;
   ctx.lineCap = 'round';
@@ -213,6 +215,7 @@ function drawHookGauge(ctx, hx, hy, s) {
     ctx.fillStyle = i < s.lives ? '#ff6b8a' : 'rgba(120,140,160,0.45)';
     ctx.fillText('❤', cx + Math.cos(ang) * hr, cy + Math.sin(ang) * hr);
   }
+  ctx.restore();
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
 }
 

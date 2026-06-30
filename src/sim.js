@@ -87,6 +87,7 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     const A = FISH_TYPES[f.type].atk || 0;
     if (A > s.hook.dur) drain += DRAIN_K * (A - s.hook.dur);
   }
+  s.durDraining = drain > 0; // wskaźnik mocniej widoczny gdy pasek aktywnie spada
   if (drain > 0) {
     s.durability -= drain * dt;
     if (s.durability <= 0) {
