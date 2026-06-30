@@ -92,6 +92,7 @@ test('durability: słaba ryba (atk<=dur) NIE drenuje paska ani żyć', () => {
   for (let i = 0; i < 120; i++) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
   assert.equal(s.durability, dur0);    // sum atk2 <= dur6 -> zero drenażu
   assert.equal(s.lives, 3);
+  assert.equal(s.durDraining, false);  // flaga wraca do false (wskaźnik nie zostaje podświetlony)
 });
 
 test('descent runs many steps without throwing and accrues depth', () => {
