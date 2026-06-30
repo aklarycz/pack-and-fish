@@ -10,15 +10,17 @@ import { loadProgress, saveProgress } from './persistence.js';
 // Zwraca ZAWSZE staty (nigdy null). hasBronze/hasAnchor = co jest położone (do wizualu).
 export function computeHookStats(grid) {
   const { cells, cols, rows } = grid;
-  let atk = STARTER_HOOK.atk, maxLatch = STARTER_HOOK.maxLatch;
-  let bronzeIdx = -1, hasBronze = false, hasAnchor = false;
+  let atk = STARTER_HOOK.atk, maxLatch = STARTER_HOOK.maxLatch, dur = STARTER_HOOK.dur;
+  let bronzeIdx = -1, hasBronze = false, hasAnchor = false, hasWeight = false;
   let hasRocket = false, rocketDmg = 0, rocketInterval = 0;
   for (const { id, idx } of gridItems(grid, ITEMS)) {   // każdy item RAZ (nie per-komórka)
     const it = ITEMS[id];
     if (!it || it.kind !== 'accessory') continue;
     atk += it.atk || 0;                    // raw atk — zawsze
+    dur += it.dur || 0;                    // raw wytrzymałość — zawsze
     if (it.id === 'bronze') { bronzeIdx = idx; hasBronze = true; }
     if (it.id === 'anchor') hasAnchor = true;
+    if (it.id === 'weight') hasWeight = true;
     if (it.id === 'rocket') { hasRocket = true; rocketDmg = it.rocketDmg || 0; rocketInterval = it.rocketInterval || 0; }
   }
   if (bronzeIdx >= 0) { // komponent spójny (per-komórka) zawierający brązowy hak → bonus latch
@@ -38,7 +40,7 @@ export function computeHookStats(grid) {
       if (it) maxLatch += it.maxLatch || 0;
     }
   }
-  return { atk, maxLatch, zwrotnosc: STARTER_HOOK.zwrotnosc, szybkoscOpadania: STARTER_HOOK.szybkoscOpadania, hasBronze, hasAnchor, hasRocket, rocketDmg, rocketInterval };
+  return { atk, maxLatch, dur, zwrotnosc: STARTER_HOOK.zwrotnosc, szybkoscOpadania: STARTER_HOOK.szybkoscOpadania, hasBronze, hasAnchor, hasWeight, hasRocket, rocketDmg, rocketInterval };
 }
 
 export function createGame() {
@@ -63,6 +65,7 @@ export function createGame() {
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [], endless: false,
     rockets: [], rocketCd: 0, rocketTarget: null, // wyrzutnia: pociski + cooldown + ZABLOKOWANY cel
+    durability: 0, durabilityMax: 0, clearTimer: 0, // pasek wytrzymałości + opóźnienie końca stage'a
     lastResult: null,
   };
 }
@@ -184,7 +187,7 @@ export function moveItem(s, fromIdx, toIdx) {
 export function openChest(s) {
   if (s.progress.pendingChests <= 0) return null;
   s.progress.pendingChests -= 1;
-  const reward = { sc: CHEST_SC, anchor: false, rocket: false };
+  const reward = { sc: CHEST_SC, anchor: false, rocket: false, weight: false };
   s.progress.coins += CHEST_SC;
   if (!s.progress.gotAnchor) {           // 1. skrzynka WYMUSZA Kotwicę
     s.progress.inventory.anchor = (s.progress.inventory.anchor || 0) + 1;
@@ -194,6 +197,10 @@ export function openChest(s) {
     s.progress.inventory.rocket = (s.progress.inventory.rocket || 0) + 1;
     s.progress.gotRocket = true;
     reward.rocket = true;
+  } else if (!s.progress.gotWeight) {    // 3. skrzynka WYMUSZA Odważnik
+    s.progress.inventory.weight = (s.progress.inventory.weight || 0) + 1;
+    s.progress.gotWeight = true;
+    reward.weight = true;
   }
   saveProgress(s.progress);
   s.chestReveal = reward;
@@ -209,6 +216,7 @@ export function startStage(s) {
   s.lives = 3; s.depthPx = 0; s.stunned = 0; s.stunnedPoints = 0; s.coinsEarned = 0; s.score = 0; s.stars = 0;
   s.fish = []; s.latched = []; s.bubbles = []; s.spawnTimer = 0;
   s.rockets = []; s.rocketTarget = null; s.rocketCd = s.hook.hasRocket ? s.hook.rocketInterval : 0; // 1. strzał po interwale
+  s.durabilityMax = s.hook.dur; s.durability = s.durabilityMax; s.clearTimer = 0; // pełna wytrzymałość na start
   const stage = STAGES[s.stageIndex];
   s.stageOffsetM = stage.difficultyOffsetM;
   // spawn MIESZANY (nie falami): każdej rybie losujemy pozycję w sekwencji z okna wg trudności —

@@ -2,33 +2,26 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startLatch, tickLatch } from '../src/logic/combat.js';
 
-function fish(hp, windowS) {
-  return { hp, hpMax: hp, window: windowS, windowLeft: 0, state: 'aggro' };
+function fish(hp) {
+  return { hp, hpMax: hp, state: 'aggro' };
 }
 
-test('startLatch arms the window and marks fish latched', () => {
-  const f = fish(10, 2.0);
+test('startLatch marks fish latched (brak okna — ryzyko przez durability w sim)', () => {
+  const f = fish(10);
   startLatch(f);
   assert.equal(f.state, 'latched');
-  assert.equal(f.windowLeft, 2.0);
 });
 
-test('hp reaching 0 within window => stunned', () => {
-  const f = fish(10, 2.0); startLatch(f);
-  // atk 8/s, 1.0s -> 8 dmg (ongoing), another 0.5s -> 12 total -> stunned
-  assert.equal(tickLatch(f, 8, 1.0), 'ongoing');
-  assert.equal(tickLatch(f, 8, 0.5), 'stunned');
+test('hp reaching 0 => stunned (łów tylko przez HP)', () => {
+  const f = fish(10); startLatch(f);
+  assert.equal(tickLatch(f, 8, 1.0), 'ongoing');   // 8 dmg
+  assert.equal(tickLatch(f, 8, 0.5), 'stunned');   // +4 = 12 >= 10
   assert.equal(f.state, 'stunned');
 });
 
-test('window expiring before kill => escaped', () => {
-  const f = fish(100, 2.0); startLatch(f);
-  assert.equal(tickLatch(f, 8, 1.5), 'ongoing');
-  assert.equal(tickLatch(f, 8, 0.6), 'escaped');  // windowLeft < 0
-  assert.equal(f.state, 'escaped');
-});
-
-test('stun wins ties when hp hits 0 exactly as window ends', () => {
-  const f = fish(8, 1.0); startLatch(f);
-  assert.equal(tickLatch(f, 8, 1.0), 'stunned');  // hp check before window check
+test('no time limit: długo trzymana ryba NIE ucieka (tylko ongoing aż HP spadnie)', () => {
+  const f = fish(100); startLatch(f);
+  assert.equal(tickLatch(f, 8, 5.0), 'ongoing');   // 40 dmg, wciąż żyje, brak ucieczki
+  assert.equal(tickLatch(f, 8, 5.0), 'ongoing');   // 80 dmg
+  assert.equal(tickLatch(f, 8, 3.0), 'stunned');   // 104 >= 100
 });

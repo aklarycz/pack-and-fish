@@ -71,6 +71,29 @@ test('rocket locks nearest target and keeps the mark (does not switch)', () => {
   if (s.fish.includes(near)) assert.equal(s.rocketTarget, near);
 });
 
+test('durability: muskie (atk>dur) zdziera pasek -> 3 serca -> game over, NIE złowiony bazowym sprzętem', () => {
+  const s = started();                 // brąz: dur 6, atk haka 4
+  s.fishQueue = [];
+  const hookX = 200, hwy = s.depthPx + HOOK_Y;
+  s.fish.push({ type: 'twardziel', x: hookX, y: hwy, hp: 48, hpMax: 48, state: 'aggro', dir: 1, bubbleY: 0 });
+  let safety = 0;
+  while (s.mode === 'DESCENT' && safety++ < 3000) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.mode, 'END');
+  assert.equal(s.lives, 0);
+  assert.equal(s.stunned, 0);          // muskie nie złowiony — bramka na upgrade
+});
+
+test('durability: słaba ryba (atk<=dur) NIE drenuje paska ani żyć', () => {
+  const s = started();
+  s.fishQueue = [];
+  const hookX = 200, hwy = s.depthPx + HOOK_Y;
+  const dur0 = s.durability;
+  s.fish.push({ type: 'sredniak', x: hookX, y: hwy, hp: 9999, hpMax: 9999, state: 'aggro', dir: 1, bubbleY: 0 });
+  for (let i = 0; i < 120; i++) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.durability, dur0);    // sum atk2 <= dur6 -> zero drenażu
+  assert.equal(s.lives, 3);
+});
+
 test('descent runs many steps without throwing and accrues depth', () => {
   const s = started();
   for (let i = 0; i < 400; i++) {

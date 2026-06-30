@@ -84,7 +84,7 @@ const FISH_SPRITE = {
 };
 const BUBBLE_SRC = 'assets/bubble.png';
 // itemy (hak/akcesoria) — ikony plecaka + nakładki na hak w minigrze
-const ITEM_SPRITE = { rusty_hook: 'assets/items/hook.png', bronze: 'assets/items/bronze.png', anchor: 'assets/items/anchor.png', rocket: 'assets/items/rocket.png' };
+const ITEM_SPRITE = { rusty_hook: 'assets/items/hook.png', bronze: 'assets/items/bronze.png', anchor: 'assets/items/anchor.png', rocket: 'assets/items/rocket.png', weight: 'assets/items/weight.png' };
 const ROCKET_SHOT_SRC = 'assets/items/rocket-shot.png'; // pocisk (dziób w prawo → obracany w stronę celu)
 const SPLASH_SRC = 'assets/ui/splash.png'; // tło splash: pędzący Tofu z tackleboxem i wędką
 const LOGO_SRC = 'assets/ui/logo.png';     // logo "Pack&Fish"
@@ -148,7 +148,7 @@ const CAT_CAST = 'assets/cat/cat-cast-sheet-6x1.png';
 let _homeFrame = 0;
 let _lineLagX = null; // wygładzona pozycja żyłki (podąża z opóźnieniem za hakiem → wygięcie)
 const SPRITE_SCALE = 2.8; // szerokość sprite ≈ radius * scale
-const BUILD = 'b79'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
+const BUILD = 'b80'; // znacznik wersji (sanity: czy przeglądarka ma świeży kod)
 
 // Rysuje rybę: delikatny ruch w kodzie (kołysanie ogona/ciała = tilt) + PŁYNNE zawracanie
 // (scaleX `sx` przechodzi przez 0 zamiast skoku) + przyciemnienie z głębokością (dark 0..1).
@@ -544,8 +544,8 @@ function renderHome(ctx, s) {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd166'; ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`;
     ctx.fillText('SKRZYNIA!', cx, H * 0.30);
-    const itemId = s.chestReveal.anchor ? 'anchor' : s.chestReveal.rocket ? 'rocket' : null;
-    const HINT = { anchor: 'Włóż w plecaku: +1 ryba naraz, +1 atk', rocket: 'Włóż w plecaku: strzela 4 dmg co 2 s' };
+    const itemId = s.chestReveal.anchor ? 'anchor' : s.chestReveal.rocket ? 'rocket' : s.chestReveal.weight ? 'weight' : null;
+    const HINT = { anchor: 'Włóż w plecaku: +1 ryba naraz, +1 atk', rocket: 'Włóż w plecaku: strzela 4 dmg co 2 s', weight: 'Włóż w plecaku: +2 wytrzymałości haka' };
     if (itemId && ITEMS[itemId]) {
       const sz = H * 0.15, w = (ITEMS[itemId].slots || 1) * sz; // ikona z footprintem (rakietnica = 2 sloty)
       drawItemSpan(ctx, ITEMS[itemId], cx - w / 2, H * 0.355, w, sz, true); // panel rzadkości
@@ -773,7 +773,7 @@ function roundedBtn(ctx, r, color, label) {
 }
 
 const ITEM_FB = { // fallback (zanim ikona się wczyta): kolor + etykieta
-  rusty_hook: ['#9aa3ad', 'HAK'], bronze: ['#c87f3a', 'BRĄZ'], anchor: ['#5aa9e0', 'KOTW'], rocket: ['#b85c4a', 'RAKIETA'],
+  rusty_hook: ['#9aa3ad', 'HAK'], bronze: ['#c87f3a', 'BRĄZ'], anchor: ['#5aa9e0', 'KOTW'], rocket: ['#b85c4a', 'RAKIETA'], weight: ['#6b7783', 'ODWAŻNIK'],
 };
 function drawItemCell(ctx, it, x, y, cell) { drawItemSpan(ctx, it, x, y, cell, cell, true); }
 // Rysuje item w prostokącie wpx×hpx (item wieloslotowy rozciąga się na swój footprint).
@@ -986,14 +986,10 @@ function renderDescent(ctx, s, hookX, hookY) {
       ctx.fillStyle = t.color; ctx.beginPath(); ctx.arc(f.x, sy, t.radius, 0, Math.PI * 2); ctx.fill();
     }
     // wskaźnik HP — na zaczepionej ORAZ na namierzonej przez rakietnicę (widać ubywanie hp).
-    // Pasek okna (żółty) tylko gdy zaczepiona (okno dotyczy łowienia hakiem).
     if (f.state === 'latched' || f.marked) {
       const w = t.radius * 2;
       ctx.fillStyle = '#000'; ctx.fillRect(f.x - t.radius, sy - t.radius - 14, w, 5);
       ctx.fillStyle = '#ff5d5d'; ctx.fillRect(f.x - t.radius, sy - t.radius - 14, w * Math.max(0, f.hp / f.hpMax), 5);
-      if (f.state === 'latched') {
-        ctx.fillStyle = '#ffd166'; ctx.fillRect(f.x - t.radius, sy - t.radius - 8, w * Math.max(0, f.windowLeft / f.window), 4);
-      }
     }
     // mark celownika rakietnicy — czerwony narożnikowy reticle (cel namierzony przez wyrzutnię)
     if (f.marked) {
@@ -1082,6 +1078,23 @@ function renderDescent(ctx, s, hookX, hookY) {
     ctx.restore();
   });
 
+  // ODWAŻNIK (sinker) — wisi na żyłce tuż nad oczkiem (jeśli założony). weight.png lub proceduralny teardrop.
+  if (s.hook && s.hook.hasWeight) {
+    const wsz = hookH * 0.5, wx = hookX + Math.sin(nowD * 1.6) * 3, wy = eyeletY - hookH * 0.30;
+    const wim = keyedEdge(ITEM_SPRITE.weight);
+    if (wim) {
+      const ar = (wim.width || 1) / (wim.height || 1), wh = wsz, ww = wh * ar;
+      ctx.drawImage(wim, wx - ww / 2, wy - wh / 2, ww, wh);
+    } else {
+      ctx.save();
+      ctx.fillStyle = '#5b6b7a'; ctx.strokeStyle = '#27313c'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(wx, wy + wsz * 0.08, wsz * 0.32, wsz * 0.44, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#8b97a3'; ctx.beginPath(); ctx.ellipse(wx, wy - wsz * 0.34, wsz * 0.12, wsz * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); // oczko
+      ctx.fillStyle = 'rgba(200,222,244,0.35)'; ctx.beginPath(); ctx.ellipse(wx - wsz * 0.1, wy - wsz * 0.04, wsz * 0.09, wsz * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
   // JEDEN widoczny hak wg tego co założone: kotwiczka > brąz > rusty (baza). Z kotwą+brązem → kotwa na brąz.
   const hasBronze = s.hook && s.hook.hasBronze, hasAnchor = s.hook && s.hook.hasAnchor;
   const hookSrc = hasAnchor ? ITEM_SPRITE.anchor : hasBronze ? ITEM_SPRITE.bronze : ITEM_SPRITE.rusty_hook;
@@ -1114,6 +1127,17 @@ function renderDescent(ctx, s, hookX, hookY) {
   const starsX0 = scoreRight + 12;
   for (let k = 0; k < 3; k++) star(ctx, starsX0 + sgap * (k + 0.5), baseY - 6, starR, k < liveStars);
   ctx.textAlign = 'left';
+  // pasek WYTRZYMAŁOŚCI haka (pod top barem, lewo) — zielony→żółty→czerwony w miarę zdzierania
+  if (s.durabilityMax > 0) {
+    const dw = WORLD.W * 0.34, dh = Math.max(6, WORLD.H * 0.011), dx = 12, dy = WORLD.topBarH + 7;
+    const frac = Math.max(0, Math.min(1, s.durability / s.durabilityMax));
+    fillRR(ctx, dx, dy, dw, dh, dh / 2, 'rgba(8,20,30,0.7)');
+    const col = frac > 0.5 ? '#6fd86f' : frac > 0.25 ? '#e8c24a' : '#e85a5a';
+    if (frac > 0) fillRR(ctx, dx, dy, dw * frac, dh, dh / 2, col);
+    ctx.fillStyle = 'rgba(207,226,245,0.85)'; ctx.font = `bold ${Math.round(WORLD.topBarH * 0.26)}px sans-serif`; ctx.textAlign = 'left';
+    ctx.fillText('HAK', dx + dw + 8, dy + dh);
+    ctx.textAlign = 'left';
+  }
 
   // kurtyna reveal: krzaki trzymają ZAKRYTE (HOLD, "loading"), potem rozjeżdżają się (OPEN)
   if (s.reveal) {

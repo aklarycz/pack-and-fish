@@ -41,11 +41,17 @@ export const STARTER_HOOK = {
   name: 'Zardzewiały hak',
   kind: 'hook',
   atk: 1,                // dmg/s — goły hak prawie nic nie ubija
+  dur: 2,                // wytrzymałość (rating = max paska). Ryby z atk > dur zdzierają pasek.
   zwrotnosc: 280,        // px/s dryfu L/P
   szybkoscOpadania: 40,  // px/s opadania (łagodny scroll w górę, by nie przebijał pływania ryb)
   maxLatch: 1,           // ile ryb naraz hak zaczepia (akcesoria dodają +)
   w: 1, h: 1,
 };
+
+// Mechanika wytrzymałości: podczas zacięcia ryba z atk A > durability D haka zdziera pasek
+// w tempie DRAIN_K·(A−D)/s. Pasek do zera = −1 serce + odnowienie paska (walczysz dalej). 3 serca = koniec.
+export const DRAIN_K = 0.42;
+export const GRAB_DELAY = 0.15; // s kontaktu zanim ryba się zaczepi (pozwala odprowadzić hak od muskie)
 
 // Akcesoria. `slots` = ile komórek gridu (poziomo) zajmuje item — tacklebox 3×3 = 9 slotów
 // pojemności, więc itemy wieloslotowe to wybór builda. `mount` = jak rysuje się na żyłce:
@@ -54,12 +60,12 @@ export const STARTER_HOOK = {
 // Brązowy hak — startowe akcesorium (z tutoriala): +3 atk (rusty 1 + brąz 3 = 4).
 export const BRONZE_HOOK = {
   id: 'bronze', name: 'Brązowy hak', kind: 'accessory', mount: 'hook', rarity: 'uncommon',
-  atk: 3, slots: 1, w: 1, h: 1, desc: '+3 atk (na haku)',
+  atk: 3, dur: 4, slots: 1, w: 1, h: 1, desc: '+3 atk, +4 wytrzymałości (na haku)',
 };
-// Kotwica — z 1. skrzyni: +1 jednoczesny zaczep oraz +1 atk.
+// Kotwica — z 1. skrzyni: +1 jednoczesny zaczep, +1 atk, +3 wytrzymałości.
 export const ANCHOR = {
   id: 'anchor', name: 'Kotwica', kind: 'accessory', mount: 'hook', rarity: 'rare',
-  maxLatch: 1, atk: 1, slots: 1, w: 1, h: 1, desc: '+1 ryba naraz, +1 atk (połącz z hakiem)',
+  maxLatch: 1, atk: 1, dur: 3, slots: 1, w: 1, h: 1, desc: '+1 ryba naraz, +1 atk, +3 wytrz. (połącz z hakiem)',
 };
 // Wyrzutnia rakiet — z 2. skrzyni: AUTONOMICZNA (działa niezależnie od połączenia). Co `rocketInterval` s
 // namierza najbliższą rybę (zaczepioną lub nie), nakłada mark i zdejmuje `rocketDmg` hp. Zajmuje 2 sloty.
@@ -67,6 +73,11 @@ export const ROCKET = {
   id: 'rocket', name: 'Wyrzutnia rakiet', kind: 'accessory', mount: 'side', rarity: 'epic',
   slots: 2, w: 2, h: 1, rocketDmg: 4, rocketInterval: 2,
   desc: 'Co 2 s: 4 dmg do najbliższej ryby (działa też na zaczepioną). 2 sloty.',
+};
+// Odważnik — ze skrzyni za stage 3: +2 wytrzymałości (komfort vs mocne ryby). Wisi na żyłce (sinker).
+export const WEIGHT = {
+  id: 'weight', name: 'Odważnik', kind: 'accessory', mount: 'sinker', rarity: 'rare',
+  dur: 2, slots: 1, w: 1, h: 1, desc: '+2 wytrzymałości haka',
 };
 
 // Rzadkości — kolor tła slotu pod ikoną itemu (sygnał siły). common→epic→legendary.
@@ -84,6 +95,7 @@ export const ITEMS = {
   [BRONZE_HOOK.id]: BRONZE_HOOK,
   [ANCHOR.id]: ANCHOR,
   [ROCKET.id]: ROCKET,
+  [WEIGHT.id]: WEIGHT,
 };
 
 // Nagroda ze skrzynki za ukończenie stage (≥1★). Pierwsza skrzynka wymusza Kotwicę.
@@ -105,19 +117,17 @@ export const TEST_FREE_HOOK = true;
 // Czas lotu pocisku rakietnicy (s) — większy = wolniejszy pocisk. (2× wolniej: 0.32 → 0.64)
 export const ROCKET_FLIGHT = 0.64;
 
-// 3 archetypy: jedna oś = HP vs okno. scoreValue liczy się przy ogłuszeniu.
+// 3 archetypy. `hp` = ile dmg trzeba zadać hakiem (łów). `atk` = jak mocno szarpie: jeśli atk > durability
+// haka, zdziera pasek wytrzymałości (DRAIN_K·(atk−dur)/s). scoreValue liczy się przy ogłuszeniu.
 export const FISH_TYPES = {
-  // speed = pozioma prędkość pływania (px/s). Wyższa niż szybkoscOpadania, żeby
-  // ruch w bok DOMINOWAŁ nad scrollem opadania → ryby czytają się jak pływające.
-  // coins (waluta do merge) oddzielone od scoreValue (do score).
-  // okna szersze (łapanie z zapasem, nie "na styk"); radius powiększany etapami (większe ryby, ostatnio +20%).
-  // bass (mała): szybka, UCIEKA od haka; łatwa do złapania (niski hp)
-  plotka:    { id: 'plotka',    hp: 6,  window: 2.6, speed: 108, aggroRange: 130, radius: 44, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
-  // sum (średnia): wolniejszy, UCIEKA; ŁOWIALNY gołym brązem (atk4·okno4.2 = 16.8 dmg) przez cały
-  // stage 1 — hp 12 (z 20), na dnie ~×1.28 → 15.3 < 16.8. Z kotwicą/rakietnicą trywialny.
-  sredniak:  { id: 'sredniak',  hp: 12, window: 4.2, speed: 72,  aggroRange: 150, radius: 76, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
-  // muskie (duża): ATAKUJE hak, NIE DO ZŁAPANIA bazowym sprzętem (8·2.4=19.2 ≪ 40; z kotwicą 9·2.4=21.6 ≪ 40)
-  twardziel: { id: 'twardziel', hp: 40, window: 2.4, speed: 90,  aggroRange: 210, radius: 119, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
+  // speed = pozioma prędkość pływania (px/s). coins (merge) oddzielone od scoreValue (score). radius +20%.
+  // bass (mała): szybka, UCIEKA; łatwa (niski hp, atk poniżej każdego haka → zero drenażu).
+  plotka:    { id: 'plotka',    hp: 6,  atk: 1,  speed: 108, aggroRange: 130, radius: 44, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
+  // sum (średnia): UCIEKA; atk 2 ≤ durability każdego haka → bezpieczny do łowienia.
+  sredniak:  { id: 'sredniak',  hp: 12, atk: 2,  speed: 72,  aggroRange: 150, radius: 76, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
+  // muskie (duża): ATAKUJE hak. atk 10 ≫ durability bazowego brązu (6) → zdziera 3 serca ~pod koniec łowu
+  // (bramka na upgrade). Od kotwicy (dur 9, atk−dur=1) pasek prawie nie spada → łowialny.
+  twardziel: { id: 'twardziel', hp: 48, atk: 10, speed: 90,  aggroRange: 210, radius: 119, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };
 
 // Rampa wg głębokości (metry). Wartości interpolowane/progowane w ramp.js.

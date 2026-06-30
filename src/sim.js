@@ -1,5 +1,7 @@
 // Czysta symulacja jednej klatki descentu (bez DOM). main.js woła to w pętli rAF.
-import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT } from './config.js';
+import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY } from './config.js';
+
+const CLEAR_DELAY = 3.5; // s po wyczyszczeniu worka zanim odpali ekran END (gracz musi zauważyć)
 import { difficultyAt } from './logic/ramp.js';
 import { createFish } from './logic/spawn.js';
 import { startLatch, tickLatch } from './logic/combat.js';
@@ -65,32 +67,43 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
 
   const hookWorldY = s.depthPx + hookScreenY;
 
-  // latch / damage — WIELE ryb naraz (maxLatch); każda obrywa atk/s niezależnie
+  // latch / damage — WIELE ryb naraz (maxLatch); każda obrywa atk/s. Łów gdy HP→0 (brak ucieczki).
   for (let li = s.latched.length - 1; li >= 0; li--) {
     const f = s.latched[li];
     // pozycja: rozłożone wokół haka, podążają za graczem
     f.x = hookX + (li - (s.latched.length - 1) / 2) * 50;
     f.y = hookWorldY + 4;
-    const res = tickLatch(f, s.hook.atk, dt);
-    if (res === 'stunned') {
+    if (tickLatch(f, s.hook.atk, dt) === 'stunned') {
       registerStun(s, FISH_TYPES[f.type]);
       f.bubbleY = f.y; s.bubbles.push(f);
-      removeFish(s, f); s.latched.splice(li, 1);
-    } else if (res === 'escaped') {
-      registerEscape(s);
       removeFish(s, f); s.latched.splice(li, 1);
     }
   }
 
-  // ruch ryb + wykrycie kontaktu (zaczepia dopóki jest wolny slot maxLatch)
+  // === WYTRZYMAŁOŚĆ === ryby z atk > durability haka zdzierają pasek (suma po zaczepionych).
+  // Pasek do zera → −1 serce; jeśli gra trwa, pasek się odnawia i WALCZYSZ DALEJ.
+  let drain = 0;
+  for (const f of s.latched) {
+    const A = FISH_TYPES[f.type].atk || 0;
+    if (A > s.hook.dur) drain += DRAIN_K * (A - s.hook.dur);
+  }
+  if (drain > 0) {
+    s.durability -= drain * dt;
+    if (s.durability <= 0) {
+      registerEscape(s);                                       // −1 serce (może zakończyć grę)
+      if (s.mode === 'DESCENT') s.durability = s.durabilityMax; // odnów pasek, walcz dalej
+    }
+  }
+
+  // ruch ryb + wykrycie kontaktu. Zaczepienie po GRAB_DELAY ciągłego kontaktu (można odprowadzić hak).
   for (const f of s.fish) {
     updateFish(f, hookX, hookWorldY, dt, diff.speedMul);
     if (s.latched.length < s.hook.maxLatch && (f.state === 'patrol' || f.state === 'aggro') && s.latched.indexOf(f) < 0) {
       const r = FISH_TYPES[f.type].radius;
       if (Math.hypot(f.x - hookX, f.y - hookWorldY) <= r + 8) {
-        startLatch(f);
-        s.latched.push(f);
-      }
+        f.contactT = (f.contactT || 0) + dt;
+        if (f.contactT >= GRAB_DELAY) { startLatch(f); s.latched.push(f); }
+      } else f.contactT = 0;
     }
   }
 
@@ -141,7 +154,10 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   s.bubbles = s.bubbles.filter(b => b.bubbleY - s.depthPx > -40);
   s.fish = s.fish.filter(f => s.latched.indexOf(f) >= 0 || (f.y - s.depthPx) > -160);
 
-  // pula wyczerpana i wszystkie ryby zeszły/rozstrzygnięte -> łowisko wyczyszczone
-  // (w trybie testowym nieskończonym worek nigdy nie jest pusty, więc to nie odpala)
-  if (!s.endless && s.fishQueue.length === 0 && s.fish.length === 0 && s.latched.length === 0) descentCleared(s);
+  // pula wyczerpana i wszystkie ryby zeszły/rozstrzygnięte -> po CLEAR_DELAY łowisko wyczyszczone
+  // (opóźnienie, by gracz zauważył koniec; w trybie testowym worek nigdy pusty, więc nie odpala)
+  if (!s.endless && s.fishQueue.length === 0 && s.fish.length === 0 && s.latched.length === 0) {
+    s.clearTimer += dt;
+    if (s.clearTimer >= CLEAR_DELAY) descentCleared(s);
+  } else s.clearTimer = 0;
 }

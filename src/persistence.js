@@ -1,6 +1,6 @@
 // Zapis postępu w localStorage (gwiazdki/best score/odblokowania + hak).
 // Guard na środowisko bez localStorage (testy Node) — wtedy działa na domyślnych.
-const KEY = 'packfish_progress_v10'; // bump = reset progresu (v10 = reset na żądanie)
+const KEY = 'packfish_progress_v11'; // bump = reset progresu (v11 = mechanika durability + odważnik)
 
 export function defaultProgress(stageCount) {
   const stages = [];
@@ -17,6 +17,7 @@ export function defaultProgress(stageCount) {
     pendingChests: 0,    // skrzynki do otwarcia na Home
     gotAnchor: false,    // czy pierwsza (wymuszona) Kotwica już przyznana
     gotRocket: false,    // czy druga (wymuszona) Wyrzutnia rakiet już przyznana
+    gotWeight: false,    // czy trzecia (wymuszona) Odważnik już przyznany
     tackleboxTier: 0,    // poziom tackleboxa (pojemność gridu) — rośnie z lepszym tackleboxem
     inventory: { bronze: 1 }, // start: brązowy hak (z tutoriala) — +3 atk po włożeniu
     tutBronzeDone: false,     // czy tutorial zakładania brązowego haka zaliczony
@@ -41,6 +42,7 @@ export function loadProgress(stageCount) {
           prog.pendingChests = data.pendingChests || 0;
           prog.gotAnchor = !!data.gotAnchor;
           prog.gotRocket = !!data.gotRocket;
+          prog.gotWeight = !!data.gotWeight;
           prog.tackleboxTier = data.tackleboxTier || 0;
           prog.inventory = data.inventory || {};
           prog.tutAnchorDone = !!data.tutAnchorDone;
