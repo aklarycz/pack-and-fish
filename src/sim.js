@@ -1,5 +1,5 @@
 // Czysta symulacja jednej klatki descentu (bez DOM). main.js woła to w pętli rAF.
-import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY, RECATCH_LIMIT, RECATCH_LOCK, BOTTOM_GRACE, BOSS_LULL } from './config.js';
+import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY, RECATCH_LIMIT, RECATCH_LOCK, BOTTOM_GRACE, BOSS_LULL, BOSS_DEPTH } from './config.js';
 
 const CLEAR_DELAY = 1.5; // s po opróżnieniu łowiska przy dnie zanim odpali ekran END (gracz zauważy)
 import { difficultyAt } from './logic/ramp.js';
@@ -82,9 +82,9 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     s.spawnTimer = Math.max(sp.min, sp.start - localM * sp.perM);
     spawnFish(s, s.fishQueue.shift(), effDepthM, rng);
   }
-  // FALA BOSSA (muskie): gdy worek regularny pusty -> po BOSS_LULL wpływa muskie na końcu.
-  // Ławicy NIE wymuszamy do ucieczki — zostaje łowialna (masz czas ją dołowić); dopiero na dnie odpływa.
-  if (!s.endless && !s.bossSpawned && s.fishQueue.length === 0 && s.bossCount > 0) {
+  // FALA BOSSA (muskie): dopiero gdy worek pusty ORAZ jesteśmy w ostatnich ~18% zjazdu (BOSS_DEPTH)
+  // -> po BOSS_LULL wpływa muskie z dołu, SAM (ławica miała czas się przerzedzić). Nie wymuszamy jej ucieczki.
+  if (!s.endless && !s.bossSpawned && s.fishQueue.length === 0 && s.bossCount > 0 && localM >= BOSS_DEPTH * s.descentM) {
     s.bossLullT += dt;
     if (s.bossLullT >= BOSS_LULL) {
       for (let k = 0; k < s.bossCount; k++) spawnFish(s, 'twardziel', effDepthM, rng, true); // boss z dołu

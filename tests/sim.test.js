@@ -239,7 +239,7 @@ test('pusty worek NIE kończy stage przedwcześnie (trwa do descentM)', () => {
 
 test('boss (muskie) spawnuje się SAM po opróżnieniu worka regularnego + cisza (nie w grupie)', () => {
   const s = started();
-  s.descentM = 999;                          // nie kończymy stage przez głębokość w tym teście
+  s.descentM = 10;                           // boss pojawi się dopiero w ostatnich ~18% (>=8.2 m)
   s.fish = []; s.latched = [];
   s.fishQueue = ['plotka', 'plotka'];        // mały worek regularny
   s.bossCount = 1; s.bossSpawned = false; s.bossLullT = 0;

@@ -62,7 +62,8 @@ export const ESCAPE_SPEED_FAST = 160;  // px/s ucieczki po 2. zerwaniu (bez re-l
 export const LEAVE_SPEED = 45;         // px/s odpływania ryb po dobiciu do dna (wolno = łowialne po drodze)
 export const BOTTOM_GRACE = 8;         // s po dobiciu do dna, w których ryby zachowują się normalnie
                                        // (muskie atakuje/łowialny) ZANIM zaczną odpływać
-export const BOSS_LULL = 2.5;          // s ciszy po opróżnieniu worka regularnego zanim wpłynie boss (muskie)
+export const BOSS_LULL = 2.5;          // s ciszy (po spełnieniu warunków) zanim wpłynie boss (muskie)
+export const BOSS_DEPTH = 0.82;        // boss pojawia się dopiero w ostatnich ~18% zjazdu (ławica ma czas zniknąć)
 
 // Akcesoria. `slots` = ile komórek gridu (poziomo) zajmuje item — tacklebox 3×3 = 9 slotów
 // pojemności, więc itemy wieloslotowe to wybór builda. `mount` = jak rysuje się na żyłce:
@@ -185,16 +186,16 @@ export const STAGES_PER_ARENA = 10;
 // p/s = worek regularnych ryb (płotka/sum) — dobrany tak, by kończyć się ~70% zjazdu, zostawiając
 // czas na FALĘ BOSSA. m = muskie (boss) — spawnuje się SAM po opróżnieniu worka + BOSS_LULL cisza.
 const ARENA1_STAGES = [
-  { p: 11, s: 3,  m: 1, d: 32, spawn: 1.60 },
-  { p: 13, s: 5,  m: 1, d: 36, spawn: 1.40 },
-  { p: 16, s: 7,  m: 2, d: 40, spawn: 1.20 },
-  { p: 20, s: 9,  m: 2, d: 44, spawn: 1.05 },
-  { p: 25, s: 12, m: 3, d: 48, spawn: 0.90 },
-  { p: 27, s: 14, m: 3, d: 52, spawn: 0.90 },
-  { p: 29, s: 15, m: 4, d: 56, spawn: 0.90 },
-  { p: 31, s: 17, m: 4, d: 60, spawn: 0.90 },
-  { p: 33, s: 18, m: 5, d: 64, spawn: 0.90 },
-  { p: 35, s: 20, m: 5, d: 68, spawn: 0.90 },
+  { p: 11, s: 3,  m: 1, d: 40, spawn: 1.60 },
+  { p: 13, s: 5,  m: 1, d: 44, spawn: 1.40 },
+  { p: 16, s: 7,  m: 2, d: 48, spawn: 1.20 },
+  { p: 20, s: 9,  m: 2, d: 52, spawn: 1.05 },
+  { p: 25, s: 12, m: 3, d: 56, spawn: 0.90 },
+  { p: 27, s: 14, m: 3, d: 60, spawn: 0.90 },
+  { p: 29, s: 15, m: 4, d: 64, spawn: 0.90 },
+  { p: 31, s: 17, m: 4, d: 68, spawn: 0.90 },
+  { p: 33, s: 18, m: 5, d: 72, spawn: 0.90 },
+  { p: 35, s: 20, m: 5, d: 76, spawn: 0.90 },
 ];
 
 // Progi gwiazdek wg REALNIE osiągalnego score per epoka sprzętu (nie % teoretycznego maxa).
@@ -246,9 +247,9 @@ export const ARENAS = [
   { id: 1, name: 'Przybrzeże', bg: 'arena-01', tint: ['#16406e', '#0b2138'],
     base: { plotka: 10, sredniak: 6,  muskie: 1, muskieFrom: 0, offsetM: 0,  depthCap: 30, spawnStart: 2.3, spawnMin: 2.3, perM: 0 } },
   { id: 2, name: 'Toń',        bg: 'arena-02', tint: ['#114b5f', '#06222b'],
-    base: { plotka: 12, sredniak: 10, muskie: 2, muskieFrom: 0, offsetM: 12, descentM: 32, spawnStart: 1.9, spawnMin: 1.4, perM: 0.008 } },
+    base: { plotka: 12, sredniak: 10, muskie: 2, muskieFrom: 0, offsetM: 12, descentM: 40, spawnStart: 1.9, spawnMin: 1.4, perM: 0.008 } },
   { id: 3, name: 'Głębia',     bg: 'arena-03', tint: ['#2a2a5e', '#0a0a22'],
-    base: { plotka: 10, sredniak: 16, muskie: 3, muskieFrom: 0, offsetM: 25, descentM: 40, spawnStart: 1.6, spawnMin: 1.1, perM: 0.01 } },
+    base: { plotka: 10, sredniak: 16, muskie: 3, muskieFrom: 0, offsetM: 25, descentM: 48, spawnStart: 1.6, spawnMin: 1.1, perM: 0.01 } },
 ];
 export const ARENA_COUNT = ARENAS.length;
 
