@@ -13,6 +13,7 @@ let hookX = 0;
 let hookY = 0;
 let hookTX = 0; // cel (palec) — hak nadąża z LIMITEM prędkości (manewrowanie spowolnione)
 let hookTY = 0;
+let hookDrag = null; // dotyk: sterowanie WZGLĘDNE (gest) { sx, sy, tx, ty } — anchor przy dotknięciu
 const HOOK_SPEED = 520; // px/s — max prędkość nadążania haka za palcem (3× wolniej niż "skok")
 
 // Dopasuj canvas do okna (portret 3:4) i przelicz layout — niezależnie od rozdzielczości.
@@ -49,7 +50,7 @@ function cellAt(gi, x, y) {
 }
 
 attachInput(canvas, {
-  onPointerDown(x, y) {
+  onPointerDown(x, y, touch) {
     if (s.splash) { if (hit(s._splashBtn, x, y)) { loginGuest(s); startAudio('home'); } return; } // Guest + odblokuj muzykę (gest)
     if (s.mode === 'HOME') {
       if (s.chestReveal) { dismissChest(s); return; }  // tap zamyka reveal skrzynki
@@ -97,11 +98,16 @@ attachInput(canvas, {
     } else if (s.mode === 'END') {
       if ((s.endElapsed || 0) >= 0.6) returnHome(s); // krótka blokada, by nie przeskoczyć beatu tapem
     } else if (s.mode === 'DESCENT') {
-      hookTX = clampHookX(x); hookTY = clampHookY(y); // ustaw cel; hak nadąża z limitem prędkości
+      if (touch) hookDrag = { sx: x, sy: y, tx: hookTX, ty: hookTY }; // dotyk: anchor do sterowania względnego
+      else { hookTX = clampHookX(x); hookTY = clampHookY(y); }        // mysz: absolutnie
     }
   },
-  onPointerMove(x, y) {
-    if (s.mode === 'DESCENT') { hookTX = clampHookX(x); hookTY = clampHookY(y); }
+  onPointerMove(x, y, touch) {
+    if (s.mode === 'DESCENT') {
+      if (touch) {                                                    // dotyk: hak rusza się o DELTĘ gestu (nie pod palec)
+        if (hookDrag) { hookTX = clampHookX(hookDrag.tx + (x - hookDrag.sx)); hookTY = clampHookY(hookDrag.ty + (y - hookDrag.sy)); }
+      } else { hookTX = clampHookX(x); hookTY = clampHookY(y); }      // mysz: absolutnie
+    }
     else if (s.mode === 'BACKPACK') {
       if (s.bpDrag) {
         s.bpDrag.x = x; s.bpDrag.y = y;
@@ -114,7 +120,8 @@ attachInput(canvas, {
       }
     }
   },
-  onPointerUp(x, y) {
+  onPointerUp(x, y, touch) {
+    hookDrag = null;   // koniec gestu sterowania hakiem
     if (s.mode === 'BACKPACK') {
       if (s.bpDrag) {
         const to = cellAt(s._grid, x, y);
