@@ -244,16 +244,18 @@ export function startStage(s) {
   s.bottomT = 0;
   // spawn MIESZANY (nie falami): każdej rybie losujemy pozycję w sekwencji z okna wg trudności —
   // bass dominuje na starcie, sumy dochodzą po chwili (mieszają się z bassami), muskie na sam koniec.
-  // regularne ryby (płotka+sum) -> kolejka wg klucza; MUSKIE osobno jako boss (fala na końcu)
-  const SPAWN_WIN = { plotka: [0.0, 0.85], sredniak: [0.2, 1.0] };
+  // Stage-boss (1/5/10): muskie osobno jako fala bossa. Inne stage: muskie zwykłą rybą w ławicy (miks).
+  const isBoss = !!stage.boss;
+  const SPAWN_WIN = { plotka: [0.0, 0.85], sredniak: [0.2, 1.0], twardziel: [0.5, 0.95] };
+  const regTypes = isBoss ? ['plotka', 'sredniak'] : ['plotka', 'sredniak', 'twardziel'];
   const items = [];
-  for (const t of ['plotka', 'sredniak']) {
+  for (const t of regTypes) {
     const w = SPAWN_WIN[t] || [0, 1];
     for (let k = 0; k < (stage.bag[t] || 0); k++) items.push({ t, key: w[0] + Math.random() * (w[1] - w[0]) });
   }
   items.sort((a, b) => a.key - b.key);
   s.fishQueue = items.map(it => it.t);
-  s.bossCount = stage.bag.twardziel || 0;   // muskie = boss, spawnuje się SAM po opróżnieniu worka + cisza
+  s.bossCount = isBoss ? (stage.bag.twardziel || 0) : 0;   // fala bossa tylko na stage-bossach
   s.bossSpawned = s.bossCount === 0;
   s.bossLullT = 0;
   s.mode = 'DESCENT';

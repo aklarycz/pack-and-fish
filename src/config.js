@@ -62,8 +62,8 @@ export const ESCAPE_SPEED_FAST = 160;  // px/s ucieczki po 2. zerwaniu (bez re-l
 export const LEAVE_SPEED = 45;         // px/s odpływania ryb po dobiciu do dna (wolno = łowialne po drodze)
 export const BOTTOM_GRACE = 8;         // s po dobiciu do dna, w których ryby zachowują się normalnie
                                        // (muskie atakuje/łowialny) ZANIM zaczną odpływać
-export const BOSS_LULL = 2.5;          // s ciszy (po spełnieniu warunków) zanim wpłynie boss (muskie)
-export const BOSS_DEPTH = 0.82;        // boss pojawia się dopiero w ostatnich ~18% zjazdu (ławica ma czas zniknąć)
+export const BOSS_LULL = 1.5;          // s ciszy (po spełnieniu warunków) zanim wpłynie boss (muskie)
+export const BOSS_DEPTH = 0.68;        // boss pojawia się w ostatniej ~1/3 zjazdu (mniejsza przerwa po ławicy)
 
 // Akcesoria. `slots` = ile komórek gridu (poziomo) zajmuje item — tacklebox 3×3 = 9 slotów
 // pojemności, więc itemy wieloslotowe to wybór builda. `mount` = jak rysuje się na żyłce:
@@ -235,6 +235,7 @@ function buildArenaStages(base, arena, arenaIndex) {
     stages.push({
       arenaId: arena.id, arenaName: arena.name, bg: arena.bg, no: i + 1,
       difficultyOffsetM, bag, spawn: { start, min: start, perM: base.perM }, depthCap, descentM,
+      boss: [0, 4, 9].includes(i), // muskie = BOSS tylko na stage 1/5/10 (lokalny idx 0/4/9); reszta = ryba w ławicy
       stars: starThresholds(plotka, sredniak, muskie, depthCap, hasRocket),
     });
   }
