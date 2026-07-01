@@ -77,9 +77,9 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     s.spawnTimer = Math.max(sp.min, sp.start - localM * sp.perM);
     spawnFish(s, s.fishQueue.shift(), effDepthM, rng);
   }
-  // FALA BOSSA (muskie): gdy worek regularny pusty -> ławica odpływa, po BOSS_LULL wpływa muskie SAM na końcu.
+  // FALA BOSSA (muskie): gdy worek regularny pusty -> po BOSS_LULL wpływa muskie na końcu.
+  // Ławicy NIE wymuszamy do ucieczki — zostaje łowialna (masz czas ją dołowić); dopiero na dnie odpływa.
   if (!s.endless && !s.bossSpawned && s.fishQueue.length === 0 && s.bossCount > 0) {
-    for (const f of s.fish) if (f.state === 'patrol' || f.state === 'aggro') f.state = 'leaving'; // ławica robi miejsce
     s.bossLullT += dt;
     if (s.bossLullT >= BOSS_LULL) {
       for (let k = 0; k < s.bossCount; k++) spawnFish(s, 'twardziel', effDepthM, rng);

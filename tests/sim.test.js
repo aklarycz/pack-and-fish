@@ -248,9 +248,7 @@ test('boss (muskie) spawnuje się SAM po opróżnieniu worka regularnego + cisza
   while (!s.bossSpawned && safety++ < 4000) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
   assert.equal(s.bossSpawned, true);
   assert.equal(s.fishQueue.length, 0);                     // boss dopiero po opróżnieniu worka
-  assert.ok(s.fish.some(f => f.type === 'twardziel'));     // muskie wpłynął jako fala bossa
-  // żadna regularna ryba nie jest już w stanie patrol/aggro (zrobiły miejsce -> leaving/zniknęły)
-  assert.ok(s.fish.every(f => f.type === 'twardziel' || f.state === 'leaving'));
+  assert.ok(s.fish.some(f => f.type === 'twardziel'));     // muskie wpłynął jako fala bossa (na końcu)
 });
 
 test('descent runs many steps without throwing and accrues depth', () => {
