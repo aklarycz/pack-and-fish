@@ -183,19 +183,20 @@ export const STAGES_PER_ARENA = 10;
 // Stage 1: spokojny intro (maxLatch 1). Stage 2+: kotwica (maxLatch 2). d = descentM (metry = sekundy
 // opadania, bo 1 m/s). Gęstość (spawn) rośnie s1–s5, max płaska s6–s10. Worek ≈ d/spawn (wypełnia opadanie).
 // depthCap wyliczane w buildArenaStages = d + difficultyOffsetM (depth zawsze osiąga sufit).
-// p/s = worek regularnych ryb (płotka/sum) — dobrany tak, by kończyć się ~70% zjazdu, zostawiając
-// czas na FALĘ BOSSA. m = muskie (boss) — spawnuje się SAM po opróżnieniu worka + BOSS_LULL cisza.
+// Stage-bossy (1/5/10): mniej regularnych (~60% zjazdu), by po ławicy zrobić miejsce na falę bossa (muskie).
+// Pozostałe stage: worek WYPEŁNIA cały zjazd (bez pustego ogona), muskie wmieszany w ławicę.
+// d = descentM (m). p/s/m = płotka/sum/muskie. total ≈ d/spawn (non-boss) lub ~0.6·d/spawn (boss).
 const ARENA1_STAGES = [
-  { p: 11, s: 3,  m: 1, d: 40, spawn: 1.60 },
-  { p: 13, s: 5,  m: 1, d: 44, spawn: 1.40 },
-  { p: 16, s: 7,  m: 2, d: 48, spawn: 1.20 },
-  { p: 20, s: 9,  m: 2, d: 52, spawn: 1.05 },
-  { p: 25, s: 12, m: 3, d: 56, spawn: 0.90 },
-  { p: 27, s: 14, m: 3, d: 60, spawn: 0.90 },
-  { p: 29, s: 15, m: 4, d: 64, spawn: 0.90 },
-  { p: 31, s: 17, m: 4, d: 68, spawn: 0.90 },
-  { p: 33, s: 18, m: 5, d: 72, spawn: 0.90 },
-  { p: 35, s: 20, m: 5, d: 76, spawn: 0.90 },
+  { p: 12, s: 3,  m: 1, d: 40, spawn: 1.60 }, // stage 1  BOSS
+  { p: 20, s: 9,  m: 2, d: 44, spawn: 1.40 }, // stage 2
+  { p: 26, s: 12, m: 2, d: 48, spawn: 1.20 }, // stage 3
+  { p: 31, s: 15, m: 3, d: 52, spawn: 1.05 }, // stage 4
+  { p: 25, s: 12, m: 3, d: 56, spawn: 0.90 }, // stage 5  BOSS
+  { p: 44, s: 20, m: 3, d: 60, spawn: 0.90 }, // stage 6
+  { p: 46, s: 21, m: 4, d: 64, spawn: 0.90 }, // stage 7
+  { p: 49, s: 23, m: 4, d: 68, spawn: 0.90 }, // stage 8
+  { p: 51, s: 24, m: 5, d: 72, spawn: 0.90 }, // stage 9
+  { p: 33, s: 17, m: 5, d: 76, spawn: 0.90 }, // stage 10 BOSS
 ];
 
 // Progi gwiazdek wg REALNIE osiągalnego score per epoka sprzętu (nie % teoretycznego maxa).
