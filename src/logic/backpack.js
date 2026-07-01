@@ -61,6 +61,22 @@ export function findFreeRunAvoiding(grid, w, avoidId) {
   return findFreeRun(grid, w);
 }
 
+// Zbiór indeksów KOMÓREK akcesoriów 4-spójnie połączonych z brązowym hakiem (komponent z brązem).
+// Pusty gdy brak brązu. Rozmiar >= 2 = realne połączenie (brąz + co najmniej jedno akcesorium).
+export function bronzeComponent(grid, ITEMS) {
+  const { cells, cols, rows } = grid;
+  const start = cells.indexOf('bronze');
+  if (start < 0) return new Set();
+  const seen = new Set([start]), stack = [start];
+  while (stack.length) {
+    const idx = stack.pop(), r = Math.floor(idx / cols), c = idx % cols, nb = [];
+    if (r > 0) nb.push(idx - cols); if (r < rows - 1) nb.push(idx + cols);
+    if (c > 0) nb.push(idx - 1); if (c < cols - 1) nb.push(idx + 1);
+    for (const n of nb) { const it = cells[n] && ITEMS[cells[n]]; if (it && it.kind === 'accessory' && !seen.has(n)) { seen.add(n); stack.push(n); } }
+  }
+  return seen;
+}
+
 // Lista itemów w gridzie: {id, idx (origin), w}. Każdy item raz (nie per-komórka).
 export function gridItems(grid, ITEMS) {
   const out = [], { cells, cols, rows } = grid;

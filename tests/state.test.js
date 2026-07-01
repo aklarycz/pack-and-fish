@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createGame, placeHook, startStage, addDepth, registerStun, registerEscape,
   carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, stageUnlocked, descentCleared,
-  openChest, placeAccessory, moveItem, computeHookStats, loginGuest, returnHome,
+  openChest, placeAccessory, placeAccessoryAt, moveItem, computeHookStats, loginGuest, returnHome,
 } from '../src/state.js';
 import { STARTER_HOOK, FISH_TYPES, WORLD, STAGES, STAGES_PER_ARENA, PLAYABLE_STAGES } from '../src/config.js';
 
@@ -176,6 +176,42 @@ test('multi-slot item does not double-count stats', () => {
   s.hook = computeHookStats(s.grid);
   assert.equal(s.hook.atk, STARTER_HOOK.atk);        // raz, nie 2×
   assert.equal(s.hook.hasRocket, true);
+});
+
+test('placeAccessoryAt kładzie 1-slotowy item na wskazanej wolnej kratce', () => {
+  const s = createGame(); placeHook(s, 0, 0);            // rusty w idx 0
+  s.progress.inventory.weight = 1;
+  assert.equal(placeAccessoryAt(s, 'weight', 4), true);  // środek gridu 3x3
+  assert.equal(s.grid.cells[4], 'weight');
+  assert.equal(s.progress.inventory.weight, undefined);  // zdjęte z inventory
+});
+
+test('placeAccessoryAt kładzie 2-slotowy (rocket) na dwóch kolejnych wolnych', () => {
+  const s = createGame(); placeHook(s, 0, 0);
+  s.progress.inventory.rocket = 1;
+  assert.equal(placeAccessoryAt(s, 'rocket', 3), true);  // wiersz 1: idx 3,4
+  assert.equal(s.grid.cells[3], 'rocket');
+  assert.equal(s.grid.cells[4], 'rocket');
+  assert.equal(s.hook.hasRocket, true);                  // przeliczony hook
+});
+
+test('placeAccessoryAt odrzuca gdy ciąg wychodzi poza wiersz', () => {
+  const s = createGame(); placeHook(s, 0, 0);
+  s.progress.inventory.rocket = 1;
+  assert.equal(placeAccessoryAt(s, 'rocket', 2), false); // idx2 = ostatnia kolumna, w=2
+  assert.equal(s.progress.inventory.rocket, 1);          // nie zużyte
+});
+
+test('placeAccessoryAt odrzuca gdy kratka zajęta', () => {
+  const s = createGame();
+  placeAccessory(s, 'bronze');                           // bronze -> idx 0 (pierwszy wolny)
+  s.progress.inventory.weight = 1;
+  assert.equal(placeAccessoryAt(s, 'weight', 0), false); // idx0 zajęte przez bronze
+});
+
+test('placeAccessoryAt odrzuca gdy brak itemu w inventory', () => {
+  const s = createGame(); placeHook(s, 0, 0);
+  assert.equal(placeAccessoryAt(s, 'weight', 4), false);
 });
 
 test('fish award coins from their coins field', () => {

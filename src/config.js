@@ -175,17 +175,20 @@ export const STAGES_PER_ARENA = 10;
 // Jawna kompozycja Areny 1 (przebalansowane przez game designera — patrz docs/balance-arena1.md):
 // p/s/m = plotka/sredniak/muskie (suma = total: 20,25,...,65). Muskie ramp ⌈stage/2⌉ (1,1,2,2,3,3,4,4,5,5)
 // — łagodniejszy niż dosłowne 1,3,5..., bo muskie są praktycznie niełowialne i 3 naraz = pewna strata żyć.
+// Stage 1: spokojny intro (maxLatch 1, brak kotwicy) — wolny spawn.
+// Stage 2+: gracz ma kotwicę (maxLatch 2) -> GĘSTY spawn (~2× szybszy) + więcej ryb,
+// żeby realnie łapać 2 naraz. Muskie (m) rośnie łagodnie (bramka na wytrzymałość).
 const ARENA1_STAGES = [
-  { p: 15, s: 4,  m: 1, cap: 30, spawn: 2.30 },
-  { p: 18, s: 6,  m: 1, cap: 34, spawn: 2.20 },
-  { p: 20, s: 8,  m: 2, cap: 38, spawn: 2.10 },
-  { p: 23, s: 10, m: 2, cap: 42, spawn: 2.00 },
-  { p: 24, s: 13, m: 3, cap: 46, spawn: 1.90 },
-  { p: 25, s: 17, m: 3, cap: 50, spawn: 1.80 },
-  { p: 26, s: 20, m: 4, cap: 54, spawn: 1.75 },
-  { p: 27, s: 24, m: 4, cap: 58, spawn: 1.70 },
-  { p: 27, s: 28, m: 5, cap: 62, spawn: 1.65 },
-  { p: 27, s: 33, m: 5, cap: 66, spawn: 1.60 },
+  { p: 15, s: 4,  m: 1, cap: 30, spawn: 2.00 },
+  { p: 22, s: 8,  m: 1, cap: 34, spawn: 1.25 },
+  { p: 25, s: 11, m: 2, cap: 38, spawn: 1.15 },
+  { p: 28, s: 14, m: 2, cap: 42, spawn: 1.05 },
+  { p: 30, s: 18, m: 3, cap: 46, spawn: 1.00 },
+  { p: 31, s: 23, m: 3, cap: 50, spawn: 0.95 },
+  { p: 32, s: 27, m: 4, cap: 54, spawn: 0.90 },
+  { p: 33, s: 32, m: 4, cap: 58, spawn: 0.85 },
+  { p: 33, s: 37, m: 5, cap: 62, spawn: 0.80 },
+  { p: 33, s: 43, m: 5, cap: 66, spawn: 0.75 },
 ];
 
 // Progi gwiazdek wg REALNIE osiągalnego score per epoka sprzętu (nie % teoretycznego maxa).
@@ -268,3 +271,7 @@ export const TACKLEBOX_TIERS = [
   { cols: 4, rows: 4, name: 'Tacklebox mistrza', body: '#46365a', trim: '#c08bff' },
 ];
 export function tackleboxOf(tier) { return TACKLEBOX_TIERS[Math.max(0, Math.min(TACKLEBOX_TIERS.length - 1, tier || 0))]; }
+
+// Tacka ekwipunku w plecaku: siatka slotów, footprint itemów, scroll gdy nie mieści.
+export const INV_COLS = 6;            // liczba kolumn siatki inventory
+export const INV_VISIBLE_ROWS = 2.5;  // ile rzędów widać (0.5 = peek -> sygnał scrolla)

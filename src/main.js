@@ -1,5 +1,5 @@
 import { WORLD, BACKPACK, layoutWorld, CAST_DUR, ITEMS, TEST_ENDLESS_DESCENT } from './config.js';
-import { createGame, placeHook, placeAccessory, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest, loginGuest } from './state.js';
+import { createGame, placeHook, placeAccessory, placeAccessoryAt, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest, loginGuest } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
@@ -61,16 +61,28 @@ attachInput(canvas, {
         if (!s.cast && s.hook && stageUnlocked(s)) s.cast = { t: 0 }; // zarzut -> potem descent
       }
     } else if (s.mode === 'BACKPACK') {
+      if (s.bpSelected) {   // popup modal otwarty — ma priorytet, blokuje resztę
+        if (s._bpPlaceBtn && hit(s._bpPlaceBtn, x, y)) placeAccessory(s, s.bpSelected.id);
+        else if (s._bpUnequipBtn && hit(s._bpUnequipBtn, x, y)) unequipAccessory(s, s.bpSelected.gridIdx);
+        else s.bpSelected = null;   // tap obok zamyka popup
+        return;
+      }
       if (s._backpackBack && hit(s._backpackBack, x, y)) { closeBackpack(s); return; }
-      if (s._bpPlaceBtn && hit(s._bpPlaceBtn, x, y)) { placeAccessory(s, s.bpSelected.id); return; }
-      if (s._bpUnequipBtn && hit(s._bpUnequipBtn, x, y)) { unequipAccessory(s, s.bpSelected.gridIdx); return; }
       const cell = cellAt(s._grid, x, y);
       if (!s.hook) {
         if (cell >= 0) placeHook(s, cell % s.grid.cols, Math.floor(cell / s.grid.cols));
       } else if (cell >= 0 && s.grid.cells[cell] && ITEMS[s.grid.cells[cell]] && ITEMS[s.grid.cells[cell]].kind !== 'hook') {
         s.bpDrag = { fromIdx: cell, id: s.grid.cells[cell], x, y, ox: x, oy: y, moved: false }; // tap=opis / drag=przenieś (bazowego haka nie ruszamy)
-      } else if (s._bpInv) {
-        for (const it of s._bpInv) if (hit(it.rect, x, y)) { selectAccessory(s, it.id); break; } // klik = opis
+      } else {
+        // ekwipunek: down na kafelku -> start drag (tap vs drag rozstrzygane na up); pusta tacka -> scroll
+        let onItem = null;
+        if (s._bpInv) for (const it of s._bpInv) if (hit(it.rect, x, y)) { onItem = it; break; }
+        if (onItem) {
+          s.bpInvDrag = { id: onItem.id, x, y, ox: x, oy: y, moved: false };
+        } else if (s._bpInvGrid && s._bpInvGrid.scrollMax > 0 &&
+                   hit({ x: s._bpInvGrid.ox, y: s._bpInvGrid.oy, w: s._bpInvGrid.trayW, h: s._bpInvGrid.trayH }, x, y)) {
+          s.bpInvScrollDrag = { oy: y, start: s.bpInvScroll };
+        }
       }
     } else if (s.mode === 'END') {
       if ((s.endElapsed || 0) >= 0.6) returnHome(s); // krótka blokada, by nie przeskoczyć beatu tapem
@@ -80,17 +92,37 @@ attachInput(canvas, {
   },
   onPointerMove(x, y) {
     if (s.mode === 'DESCENT') { hookTX = clampHookX(x); hookTY = clampHookY(y); }
-    else if (s.mode === 'BACKPACK' && s.bpDrag) {
-      s.bpDrag.x = x; s.bpDrag.y = y;
-      if (Math.hypot(x - s.bpDrag.ox, y - s.bpDrag.oy) > 10) s.bpDrag.moved = true;
+    else if (s.mode === 'BACKPACK') {
+      if (s.bpDrag) {
+        s.bpDrag.x = x; s.bpDrag.y = y;
+        if (Math.hypot(x - s.bpDrag.ox, y - s.bpDrag.oy) > 10) s.bpDrag.moved = true;
+      } else if (s.bpInvDrag) {
+        s.bpInvDrag.x = x; s.bpInvDrag.y = y;
+        if (Math.hypot(x - s.bpInvDrag.ox, y - s.bpInvDrag.oy) > 10) s.bpInvDrag.moved = true;
+      } else if (s.bpInvScrollDrag && s._bpInvGrid) {
+        s.bpInvScroll = Math.max(0, Math.min(s._bpInvGrid.scrollMax, s.bpInvScrollDrag.start - (y - s.bpInvScrollDrag.oy)));
+      }
     }
   },
   onPointerUp(x, y) {
-    if (s.mode === 'BACKPACK' && s.bpDrag) {
-      const to = cellAt(s._grid, x, y);
-      if (s.bpDrag.moved && to >= 0 && to !== s.bpDrag.fromIdx) moveItem(s, s.bpDrag.fromIdx, to);
-      else selectPlaced(s, s.bpDrag.fromIdx); // tap (bez przesunięcia) = opis
-      s.bpDrag = null;
+    if (s.mode === 'BACKPACK') {
+      if (s.bpDrag) {
+        const to = cellAt(s._grid, x, y);
+        if (s.bpDrag.moved && to >= 0 && to !== s.bpDrag.fromIdx) moveItem(s, s.bpDrag.fromIdx, to);
+        else selectPlaced(s, s.bpDrag.fromIdx); // tap (bez przesunięcia) = opis
+        s.bpDrag = null;
+      } else if (s.bpInvDrag) {
+        const to = cellAt(s._grid, x, y);
+        if (s.bpInvDrag.moved && to >= 0) placeAccessoryAt(s, s.bpInvDrag.id, to); // drop na grid = włóż na wskazany slot
+        else if (!s.bpInvDrag.moved) selectAccessory(s, s.bpInvDrag.id);           // tap = opis
+        s.bpInvDrag = null;
+      }
+      s.bpInvScrollDrag = null;
+    }
+  },
+  onWheel(x, y, deltaY) {
+    if (s.mode === 'BACKPACK' && s._bpInvGrid && s._bpInvGrid.scrollMax > 0) {
+      s.bpInvScroll = Math.max(0, Math.min(s._bpInvGrid.scrollMax, s.bpInvScroll + deltaY * 0.5));
     }
   },
 });

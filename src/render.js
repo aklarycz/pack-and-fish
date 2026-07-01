@@ -1,6 +1,6 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ROCKET_FLIGHT, ARENAS, ARENA_COUNT, AVAILABLE_ARENAS, STAGES_PER_ARENA, arenaOf, localOf, tackleboxOf } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ROCKET_FLIGHT, ARENAS, ARENA_COUNT, AVAILABLE_ARENAS, STAGES_PER_ARENA, INV_COLS, INV_VISIBLE_ROWS, arenaOf, localOf, tackleboxOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
-import { gridItems, itemOrigin } from './logic/backpack.js';
+import { gridItems, itemOrigin, bronzeComponent } from './logic/backpack.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
 const ASSET_VER = 'b46'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
@@ -285,26 +285,27 @@ function drawTutorial(ctx, s) {
   const invRect = (id) => { const it = s._bpInv && s._bpInv.find(e => e.id === id); return it ? it.rect : null; };
   if (s.mode === 'HOME') {
     const h = s._home; if (!h) return;
-    if (s.hook.atk < 4) { target = rectCenter(h.backpack); text = 'Otwórz plecak — wzmocnij hak (brązowy hak)'; }
-    else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { target = rectCenter(h.backpack); text = 'Masz Kotwicę! Otwórz plecak'; }
+    // tutoriale JEDNORAZOWE — bramkowane flagami (nie wracają po wypięciu itemu)
+    if (!s.progress.tutBronzeDone && s.hook.atk < 4) { target = rectCenter(h.backpack); text = 'Otwórz plecak — wzmocnij hak (brązowy hak)'; }
+    else if (s.progress.tutBronzeDone && !s.progress.tutAnchorDone && s.progress.gotAnchor && s.hook.maxLatch < 2) { target = rectCenter(h.backpack); text = 'Masz Kotwicę! Otwórz plecak'; }
     else if (s.progress.pendingChests > 0 && !s.progress.gotAnchor && h.chest) { target = rectCenter(h.chest); text = 'Otwórz skrzynię!'; }
     else if (!s.progress.gotAnchor && s.progress.stages[0].stars === 0 && h.start) { target = rectCenter(h.start); text = 'Tap, by zarzucić wędkę'; }
   } else if (s.mode === 'BACKPACK') {
     const gi = s._grid;
-    if (s.hook.atk < 4) { // brązowy hak (start): wystarczy włożyć → +3 atk (raw, bez sąsiedztwa)
-      const r = invRect('bronze');
-      if (r) { target = rectCenter(r); text = 'Tap, by włożyć Brązowy hak'; }
-    } else if (s.hook.atk >= 4 && !s.progress.gotAnchor && !s.progress.tutBronzeDone && s._backpackBack) {
-      target = rectCenter(s._backpackBack); text = 'Gotowe! +3 atk — Wróć na Home';
-    } else if (s.progress.gotAnchor && s.hook.maxLatch < 2) { // kotwica: +1 ryba TYLKO obok brązowego haka
-      const r = invRect('anchor');
-      if (r) { target = rectCenter(r); text = 'Tap, by włożyć Kotwicę'; }
-      else if (gi) {
-        const ai = s.grid.cells.indexOf('anchor'), adj = freeAdjacentToHook(s.grid);
-        if (ai >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, ai)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Kotwicę obok Brązowego haka'; }
-      }
-    } else if (s.hook.maxLatch >= 2 && s.progress.gotAnchor && !s.progress.tutAnchorDone && s._backpackBack) {
-      target = rectCenter(s._backpackBack); text = 'Połączone! +1 ryba naraz — Wróć na Home';
+    if (!s.progress.tutBronzeDone) {          // tutorial brązu — dopóki nie zaliczony (zamknięcie plecaka z atk>=4)
+      if (s.hook.atk < 4) {
+        const r = invRect('bronze');
+        if (r) { target = rectCenter(r); text = 'Tap, by włożyć Brązowy hak'; }
+      } else if (s._backpackBack) { target = rectCenter(s._backpackBack); text = 'Gotowe! +3 atk — Wróć na Home'; }
+    } else if (s.progress.gotAnchor && !s.progress.tutAnchorDone) { // tutorial kotwicy — dopóki nie zaliczony
+      if (s.hook.maxLatch < 2) {
+        const r = invRect('anchor');
+        if (r) { target = rectCenter(r); text = 'Tap, by włożyć Kotwicę'; }
+        else if (gi) {
+          const ai = s.grid.cells.indexOf('anchor'), adj = freeAdjacentToHook(s.grid);
+          if (ai >= 0 && adj >= 0) { from = rectCenter(tutCellRect(gi, ai)); target = rectCenter(tutCellRect(gi, adj)); text = 'Przeciągnij Kotwicę obok Brązowego haka'; }
+        }
+      } else if (s._backpackBack) { target = rectCenter(s._backpackBack); text = 'Połączone! +1 ryba naraz — Wróć na Home'; }
     }
   }
   if (!text) return;
@@ -870,9 +871,73 @@ function drawTacklebox(ctx, x, y, w, h, tb) {
   }
 }
 
+// Tacka ekwipunku: przewijalna siatka slotów, itemy zajmują footprint (slots×1), duplikaty xN.
+// Zwraca Y pod tacką (do dalszego layoutu). Zapisuje s._bpInvGrid i s._bpInv (rect ekranowe).
+function drawInventoryTray(ctx, s, top) {
+  const W = WORLD.W, H = WORLD.H;
+  const inv = Object.entries(s.progress.inventory).filter(([, n]) => n > 0);
+  ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.02)}px sans-serif`; ctx.textAlign = 'center';
+  ctx.fillText(inv.length ? 'Ekwipunek — przeciągnij do tackleboxa (tap = opis):'
+                          : 'Brak akcesoriów — zdobądź skrzynię na Home', W / 2, top);
+  const trayTop = Math.round(top + H * 0.016);
+  const trayW = Math.round(W * 0.9), ox = Math.round((W - trayW) / 2);
+  const cols = INV_COLS, cell = Math.floor(trayW / cols);
+  const trayH = Math.round(INV_VISIBLE_ROWS * cell);
+  // layout flow z footprintem
+  const placed = []; let col = 0, row = 0;
+  for (const [id, n] of inv) {
+    const w = (ITEMS[id] && ITEMS[id].slots) || 1;
+    if (col + w > cols) { col = 0; row++; }
+    placed.push({ id, n, col, row, w }); col += w;
+  }
+  const contentRows = inv.length ? row + 1 : 0;
+  const scrollMax = Math.max(0, contentRows * cell - trayH);
+  s.bpInvScroll = Math.max(0, Math.min(scrollMax, s.bpInvScroll || 0));
+  const sc = s.bpInvScroll;
+  // tło tacki + ramka
+  fillRR(ctx, ox, trayTop, trayW, trayH, 8, 'rgba(8,20,30,0.55)');
+  rrPath(ctx, ox, trayTop, trayW, trayH, 8); ctx.strokeStyle = 'rgba(127,209,255,0.25)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.save(); rrPath(ctx, ox, trayTop, trayW, trayH, 8); ctx.clip();
+  // ramki kratek (widoczne)
+  const gridRows = Math.max(contentRows, Math.ceil(trayH / cell) + 1);
+  for (let r = 0; r < gridRows; r++) for (let c = 0; c < cols; c++) {
+    const cy = trayTop + r * cell - sc;
+    if (cy + cell < trayTop || cy > trayTop + trayH) continue;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    ctx.strokeRect(ox + c * cell + 1, cy + 1, cell - 2, cell - 2);
+  }
+  s._bpInv = [];
+  for (const p of placed) {
+    if (s.bpInvDrag && s.bpInvDrag.moved && s.bpInvDrag.id === p.id) continue; // ghost rysowany osobno
+    const cx = ox + p.col * cell, cy = trayTop + p.row * cell - sc, wpx = p.w * cell;
+    if (cy + cell < trayTop || cy > trayTop + trayH) continue;
+    drawItemSpan(ctx, ITEMS[p.id], cx, cy, wpx, cell, true);
+    if (s.bpSelected && s.bpSelected.gridIdx == null && s.bpSelected.id === p.id) {
+      rrPath(ctx, cx, cy, wpx, cell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke();
+    }
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(cell * 0.2)}px sans-serif`; ctx.textAlign = 'right';
+    ctx.fillText('x' + p.n, cx + wpx - 4, cy + cell - 6);
+    s._bpInv.push({ rect: { x: cx, y: cy, w: wpx, h: cell }, id: p.id, w: p.w });
+  }
+  ctx.restore();
+  s._bpInvGrid = { ox, oy: trayTop, cell, cols, trayH, trayW, scrollMax };
+  if (scrollMax > 0 && sc < scrollMax - 1) {  // sygnał scrolla
+    ctx.fillStyle = 'rgba(207,226,245,0.55)'; ctx.textAlign = 'center'; ctx.font = `${Math.round(H * 0.02)}px sans-serif`;
+    ctx.fillText('▼', W / 2, trayTop + trayH - 3);
+  }
+  return trayTop + trayH + H * 0.028;
+}
+
 function renderBackpack(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
-  ctx.fillStyle = '#0a2236'; ctx.fillRect(0, 0, W, H);
+  const bg = img('assets/ui/backpack-tofu.png');
+  if (ready(bg)) {
+    const iw = bg.naturalWidth, ih = bg.naturalHeight;
+    const scale = Math.max(W / iw, H / ih), dw = iw * scale, dh = ih * scale;
+    ctx.drawImage(bg, (W - dw) / 2, (H - dh) / 2, dw, dh);   // cover
+  } else {
+    ctx.fillStyle = '#0a2236'; ctx.fillRect(0, 0, W, H);     // fallback: brak pliku
+  }
   ctx.fillStyle = '#e6f0ff'; ctx.font = `bold ${Math.round(H * 0.03)}px sans-serif`; ctx.textAlign = 'center';
   ctx.fillText(s.hook ? 'Plecak' : 'Włóż hak do plecaka', W / 2, H * 0.065);
 
@@ -894,11 +959,23 @@ function renderBackpack(ctx, s) {
   }
   // 2) itemy — każdy RAZ, rozciągnięty na swój footprint (slots×1). Pomijamy aktualnie przeciągany.
   const dragOrigin = s.bpDrag ? itemOrigin(s.grid, s.bpDrag.fromIdx) : -1;
+  const linked = bronzeComponent(s.grid, ITEMS);       // komórki połączone z brązem
+  // link AKTYWNY tylko gdy w komponencie jest akcesorium z bonusem połączenia (maxLatch, np. kotwica)
+  const linkActive = [...linked].some(i => { const it = ITEMS[s.grid.cells[i]]; return it && it.maxLatch > 0; });
   for (const { id, idx, w } of gridItems(s.grid, ITEMS)) {
     if (!ITEMS[id] || idx === dragOrigin) continue;
     const c = idx % cols, r = Math.floor(idx / cols);
     const cx = ox + c * bcell, cy = oy + r * bcell, wpx = w * bcell;
     drawItemSpan(ctx, ITEMS[id], cx, cy, wpx, bcell, true); // tło rzadkości
+    // ramka POŁĄCZENIA — tylko brąz i akcesoria z bonusem połączenia (nie zwykli sąsiedzi jak odważnik/rakieta)
+    if (linkActive && (id === 'bronze' || ITEMS[id].maxLatch > 0)) {
+      let inLink = false; for (let k = 0; k < w; k++) if (linked.has(idx + k)) { inLink = true; break; }
+      if (inLink) {
+        ctx.save(); ctx.shadowColor = '#52d0ff'; ctx.shadowBlur = 8;
+        rrPath(ctx, cx + 1, cy + 1, wpx - 2, bcell - 2, 8); ctx.strokeStyle = '#52d0ff'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.restore();
+      }
+    }
     if (s.bpSelected && itemOrigin(s.grid, s.bpSelected.gridIdx) === idx) {
       rrPath(ctx, cx, cy, wpx, bcell, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke();
     }
@@ -908,68 +985,26 @@ function renderBackpack(ctx, s) {
   ctx.fillStyle = tb.trim; ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(H * 0.019)}px sans-serif`;
   ctx.fillText(tb.name + `  (${cols}×${rows})`, W / 2, oy + gh + pad + H * 0.028);
 
-  // staty haka (efekt ułożenia/adjacency) + hint przeciągania — pod obudową i nazwą tackleboxa
-  const belowY = oy + gh + pad + H * 0.055;
-  if (s.hook) {
-    ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`; ctx.textAlign = 'center';
-    ctx.fillText(`Hak: ${s.hook.atk} atk · łapie ${s.hook.maxLatch} naraz`, W / 2, belowY);
-    ctx.fillStyle = 'rgba(207,226,245,0.6)'; ctx.font = `${Math.round(H * 0.017)}px sans-serif`;
-    ctx.fillText('Połącz Kotwicę z Brązowym hakiem (obok) — wtedy +1 ryba', W / 2, belowY + H * 0.025);
-  }
-
-  let y = belowY + H * 0.06;
+  // panel PODSUMOWANIA statów haka (suma włożonych akcesoriów) — zastępuje linijkę + stary hint
+  let y = oy + gh + pad + H * 0.05;
   s._bpInv = [];
   s._bpPlaceBtn = null;
   s._bpUnequipBtn = null;
-  if (!s.hook) {
+  if (s.hook) {
+    const pw = W * 0.9, px = (W - pw) / 2, ph = H * 0.048;
+    fillRR(ctx, px, y, pw, ph, 8, 'rgba(14,34,51,0.85)');
+    rrPath(ctx, px, y, pw, ph, 8); ctx.strokeStyle = 'rgba(127,209,255,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+    const parts = [`Atak ${s.hook.atk}`, `Ryby ${s.hook.maxLatch}`, `Wytrz. ${s.hook.dur}`];
+    const projectiles = gridItems(s.grid, ITEMS).filter(g => ITEMS[g.id] && ITEMS[g.id].rocketDmg > 0).length;
+    if (projectiles > 0) parts.push(`Pociski ${projectiles}`);
+    ctx.fillStyle = '#cfe2f5'; ctx.font = `bold ${Math.round(H * 0.021)}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText(parts.join('    ·    '), W / 2, y + ph * 0.64);
+    y += ph + H * 0.022;
+    y = drawInventoryTray(ctx, s, y);
+  } else {
     ctx.fillStyle = '#ffd166'; ctx.font = `${Math.round(H * 0.024)}px sans-serif`; ctx.textAlign = 'center';
     ctx.fillText('Tap pole, by włożyć: ' + STARTER_HOOK.name, W / 2, y);
-  } else {
-    const inv = Object.entries(s.progress.inventory).filter(([, n]) => n > 0);
-    ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.022)}px sans-serif`; ctx.textAlign = 'center';
-    ctx.fillText(inv.length ? 'Dostępne akcesoria — tap, by zobaczyć:' : 'Brak akcesoriów — zdobądź skrzynię na Home', W / 2, y);
-    y += H * 0.02;
-    const cell = bcell * 0.9;
-    const rowW = inv.length * cell + (inv.length - 1) * 10;
-    inv.forEach(([id, n], k) => {
-      const r = { x: W / 2 - rowW / 2 + k * (cell + 10), y, w: cell, h: cell };
-      drawItemCell(ctx, ITEMS[id], r.x, r.y, cell);
-      if (s.bpSelected && s.bpSelected.gridIdx == null && s.bpSelected.id === id) { rrPath(ctx, r.x, r.y, r.w, r.h, 8); ctx.strokeStyle = '#ffcb45'; ctx.lineWidth = 3; ctx.stroke(); }
-      ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(cell * 0.2)}px sans-serif`; ctx.textAlign = 'right';
-      ctx.fillText('x' + n, r.x + r.w - 4, r.y + r.h - 6);
-      s._bpInv.push({ rect: r, id });
-    });
-    y += cell + H * 0.03;
-  }
-
-  // panel opisu wybranego itemu (z ekwipunku LUB włożonego) — po kliknięciu
-  if (s.bpSelected && ITEMS[s.bpSelected.id]) {
-    const it = ITEMS[s.bpSelected.id], placed = s.bpSelected.gridIdx != null;
-    const pw = W * 0.88, px = (W - pw) / 2, ph = H * 0.14, py = y;
-    fillRR(ctx, px, py, pw, ph, 10, 'rgba(14,34,51,0.96)');
-    rrPath(ctx, px, py, pw, ph, 10); ctx.strokeStyle = 'rgba(127,209,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(H * 0.024)}px sans-serif`;
-    ctx.fillText(it.name, W / 2, py + H * 0.03);
-    const stats = [];
-    if (it.atk) stats.push('+' + it.atk + ' atk');
-    if (it.maxLatch) stats.push('+' + it.maxLatch + ' ryba naraz');
-    ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.02)}px sans-serif`;
-    ctx.fillText(stats.join('   ·   '), W / 2, py + H * 0.058);
-    ctx.fillStyle = 'rgba(207,226,245,0.75)'; ctx.font = `${Math.round(H * 0.017)}px sans-serif`;
-    const note = it.id === 'bronze' ? 'Daje +atk od razu po włożeniu'
-      : it.maxLatch ? '+1 ryba działa po połączeniu z Brązowym hakiem (obok)'
-      : 'Daje raw +atk po włożeniu';
-    ctx.fillText(note, W / 2, py + H * 0.082);
-    const bw2 = W * 0.42, bh2 = H * 0.045, bx2 = W / 2 - bw2 / 2, by2 = py + ph - bh2 - H * 0.012;
-    if (placed && it.kind !== 'hook') {
-      roundedBtn(ctx, { x: bx2, y: by2, w: bw2, h: bh2 }, '#9a4b4b', 'WYPNIJ');
-      s._bpUnequipBtn = { x: bx2, y: by2, w: bw2, h: bh2 };
-    } else if (!placed && s.progress.inventory[s.bpSelected.id] > 0) {
-      roundedBtn(ctx, { x: bx2, y: by2, w: bw2, h: bh2 }, '#2e7d4f', 'WŁÓŻ');
-      s._bpPlaceBtn = { x: bx2, y: by2, w: bw2, h: bh2 };
-    }
-    y = py + ph + H * 0.02;
+    y += H * 0.04;
   }
 
   const bw = Math.round(W * 0.4), bh = Math.round(H * 0.07);
@@ -983,6 +1018,43 @@ function renderBackpack(ctx, s) {
     ctx.globalAlpha = 0.8;
     drawItemCell(ctx, ITEMS[s.bpDrag.id], s.bpDrag.x - cs / 2, s.bpDrag.y - cs / 2, cs);
     ctx.globalAlpha = 1;
+  }
+  // ghost itemu przeciąganego Z tacki inventory (footprint)
+  if (s.bpInvDrag && s.bpInvDrag.moved && ITEMS[s.bpInvDrag.id]) {
+    const cs = (s._bpInvGrid && s._bpInvGrid.cell) || s._grid.cell;
+    const w = ((ITEMS[s.bpInvDrag.id].slots) || 1) * cs;
+    ctx.globalAlpha = 0.8;
+    drawItemSpan(ctx, ITEMS[s.bpInvDrag.id], s.bpInvDrag.x - cs / 2, s.bpInvDrag.y - cs / 2, w, cs, true);
+    ctx.globalAlpha = 1;
+  }
+
+  // POPUP itemu (modal, minimal: nazwa + staty + akcja) — nad wszystkim, tap obok zamyka
+  if (s.bpSelected && ITEMS[s.bpSelected.id]) {
+    const it = ITEMS[s.bpSelected.id], placed = s.bpSelected.gridIdx != null;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, W, H);            // dim
+    const pw = W * 0.72, ph = H * 0.2, px = (W - pw) / 2, py = (H - ph) / 2;
+    fillRR(ctx, px, py, pw, ph, 12, 'rgba(14,34,51,0.98)');
+    rrPath(ctx, px, py, pw, ph, 12); ctx.strokeStyle = 'rgba(127,209,255,0.45)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(H * 0.026)}px sans-serif`;
+    ctx.fillText(it.name, W / 2, py + H * 0.05);
+    const stats = [];
+    if (it.atk) stats.push('+' + it.atk + ' atk');
+    if (it.maxLatch) stats.push('+' + it.maxLatch + ' ryba');
+    if (it.dur) stats.push('+' + it.dur + ' wytrz.');
+    if (it.rocketDmg) stats.push('rakieta ' + it.rocketDmg);
+    ctx.fillStyle = '#9fd0ff'; ctx.font = `${Math.round(H * 0.021)}px sans-serif`;
+    ctx.fillText(stats.join('   ·   '), W / 2, py + H * 0.092);
+    const bw2 = pw * 0.72, bh2 = H * 0.052, bx2 = W / 2 - bw2 / 2, by2 = py + ph - bh2 - H * 0.024;
+    if (placed && it.kind !== 'hook') {
+      roundedBtn(ctx, { x: bx2, y: by2, w: bw2, h: bh2 }, '#9a4b4b', 'WYPNIJ');
+      s._bpUnequipBtn = { x: bx2, y: by2, w: bw2, h: bh2 };
+    } else if (!placed && s.progress.inventory[s.bpSelected.id] > 0) {
+      roundedBtn(ctx, { x: bx2, y: by2, w: bw2, h: bh2 }, '#2e7d4f', 'WŁÓŻ');
+      s._bpPlaceBtn = { x: bx2, y: by2, w: bw2, h: bh2 };
+    }
+    ctx.fillStyle = 'rgba(207,226,245,0.5)'; ctx.font = `${Math.round(H * 0.015)}px sans-serif`;
+    ctx.fillText('tap obok, by zamknąć', W / 2, py + ph - H * 0.007);
   }
   ctx.textAlign = 'left';
 }
@@ -1179,7 +1251,7 @@ function renderDescent(ctx, s, hookX, hookY) {
   const starR = WORLD.topBarH * 0.16, sgap = starR * 2.5, groupW = 3 * sgap;
   const scoreRight = WORLD.W / 2 - groupW / 2 - 8;
   ctx.fillStyle = '#ffd166'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'right';
-  ctx.fillText(s.score + ' pkt', scoreRight, baseY);
+  ctx.fillText(s.score + ' score', scoreRight, baseY);
   const starsX0 = scoreRight + 12;
   for (let k = 0; k < 3; k++) star(ctx, starsX0 + sgap * (k + 0.5), baseY - 6, starR, k < liveStars);
   ctx.textAlign = 'left';
@@ -1288,7 +1360,7 @@ function renderEnd(ctx, s) {
   for (let k = 0; k < 3; k++) star(ctx, cx - sg + k * sg, H * 0.43, sr * (k === 1 ? 1.1 : 1), k < s.stars);
   // staty
   ctx.fillStyle = '#cfe2f5'; ctx.font = `${Math.round(H * 0.026)}px sans-serif`;
-  ctx.fillText('Głębia ' + Math.round(s.depthPx / WORLD.pxPerMeter) + ' m · ' + s.stunned + ' ryb · ' + s.score + ' pkt', cx, H * 0.50);
+  ctx.fillText('Głębia ' + Math.round(s.depthPx / WORLD.pxPerMeter) + ' m · ' + s.stunned + ' ryb · ' + s.score + ' score', cx, H * 0.50);
   if (s.lastResult && s.lastResult.newUnlock) {
     ctx.fillStyle = '#7fffa1'; ctx.fillText('Odblokowano kolejny stage!', cx, H * 0.55);
   } else if (s.stars === 0) {

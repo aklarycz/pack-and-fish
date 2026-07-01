@@ -19,6 +19,10 @@ export function attachInput(canvas, handlers) {
   canvas.addEventListener('touchstart', down, { passive: false });
   canvas.addEventListener('touchmove', move, { passive: false });
   canvas.addEventListener('touchend', up, { passive: false });
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault(); const { x, y } = toCanvas(e);
+    if (handlers.onWheel) handlers.onWheel(x, y, e.deltaY);
+  }, { passive: false });
 }
 
 export function clampHookX(x) {

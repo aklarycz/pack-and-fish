@@ -1,5 +1,5 @@
 import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC, ARENA_COUNT, STAGES_PER_ARENA, AVAILABLE_ARENAS, PLAYABLE_STAGES, arenaOf, localOf, tackleboxOf } from './config.js';
-import { createGrid, placeItem, findFreeRun, findFreeRunAvoiding, itemOrigin, gridItems } from './logic/backpack.js';
+import { createGrid, placeItem, findFreeRun, findFreeRunAvoiding, itemOrigin, gridItems, bronzeComponent } from './logic/backpack.js';
 import { computeScore, computeStars } from './logic/scoring.js';
 import { loadProgress, saveProgress } from './persistence.js';
 
@@ -24,13 +24,7 @@ export function computeHookStats(grid) {
     if (it.id === 'rocket') { hasRocket = true; rocketDmg = it.rocketDmg || 0; rocketInterval = it.rocketInterval || 0; }
   }
   if (bronzeIdx >= 0) { // komponent spójny (per-komórka) zawierający brązowy hak → bonus latch
-    const seen = new Set([bronzeIdx]), stack = [bronzeIdx];
-    while (stack.length) {
-      const idx = stack.pop(), r = Math.floor(idx / cols), c = idx % cols, nb = [];
-      if (r > 0) nb.push(idx - cols); if (r < rows - 1) nb.push(idx + cols);
-      if (c > 0) nb.push(idx - 1); if (c < cols - 1) nb.push(idx + 1);
-      for (const n of nb) { const it = cells[n] && ITEMS[cells[n]]; if (it && it.kind === 'accessory' && !seen.has(n)) { seen.add(n); stack.push(n); } }
-    }
+    const seen = bronzeComponent(grid, ITEMS);
     const counted = new Set();             // maxLatch liczymy RAZ na item (po origin), nie per-komórka
     for (const i of seen) {
       const o = itemOrigin(grid, i);
@@ -61,6 +55,9 @@ export function createGame() {
     reveal: null,         // kurtyna rozjeżdżająca się na starcie descentu { t }
     bpDrag: null,         // przeciągany item w plecaku { fromIdx, id, x, y }
     bpSelected: null,     // akcesorium wybrane do podglądu opisu (id)
+    bpInvDrag: null,      // przeciągany item Z tacki inventory { id, x, y, ox, oy, moved }
+    bpInvScroll: 0,       // offset przewinięcia tacki inventory (px)
+    bpInvScrollDrag: null,// aktywne przewijanie tacki { oy, start }
     // pola descentu (resetowane w startStage)
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [], endless: false,
@@ -136,6 +133,24 @@ export function placeAccessory(s, itemId) {
     ? findFreeRunAvoiding(s.grid, w, 'bronze')      // tutorial: kotwica z dala od haka -> gracz musi przeciągnąć
     : findFreeRun(s.grid, w);
   if (idx < 0) return false;                       // brak miejsca na item tej szerokości
+  for (let k = 0; k < w; k++) s.grid.cells[idx + k] = itemId;
+  s.progress.inventory[itemId] -= 1;
+  if (s.progress.inventory[itemId] <= 0) delete s.progress.inventory[itemId];
+  s.hook = computeHookStats(s.grid);
+  s.bpSelected = null;
+  persist(s);
+  return true;
+}
+
+// Kładzie akcesorium na KONKRETNYM ciągu `slots` kratek zaczynającym się w idx (drag-drop z tacki).
+// Zwraca false gdy: brak w inventory / idx poza gridem / ciąg wychodzi poza wiersz / kratka zajęta.
+export function placeAccessoryAt(s, itemId, idx) {
+  if (!s.progress.inventory[itemId]) return false;
+  const w = (ITEMS[itemId] && ITEMS[itemId].slots) || 1;
+  const cols = s.grid.cols;
+  if (idx < 0 || idx >= s.grid.cells.length) return false;
+  if ((idx % cols) + w > cols) return false;                        // nie mieści się w wierszu
+  for (let k = 0; k < w; k++) if (s.grid.cells[idx + k] !== null) return false; // zajęte
   for (let k = 0; k < w; k++) s.grid.cells[idx + k] = itemId;
   s.progress.inventory[itemId] -= 1;
   if (s.progress.inventory[itemId] <= 0) delete s.progress.inventory[itemId];
