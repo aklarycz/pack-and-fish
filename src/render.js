@@ -930,8 +930,9 @@ function drawInventoryTray(ctx, s, top) {
 
 function renderBackpack(ctx, s) {
   const W = WORLD.W, H = WORLD.H;
-  const bg = img('assets/ui/backpack-tofu.png');
-  if (ready(bg)) {
+  const bg = img('assets/ui/backpack-bg.png');
+  const hasBg = ready(bg);
+  if (hasBg) {
     const iw = bg.naturalWidth, ih = bg.naturalHeight;
     const scale = Math.max(W / iw, H / ih), dw = iw * scale, dh = ih * scale;
     ctx.drawImage(bg, (W - dw) / 2, (H - dh) / 2, dw, dh);   // cover
@@ -944,18 +945,36 @@ function renderBackpack(ctx, s) {
   // wymiary gridu z bieżącego tackleboxa (rosną z lepszym tackleboxem)
   const cols = s.grid.cols, rows = s.grid.rows;
   const tb = tackleboxOf(s.progress.tackleboxTier);
-  const bcell = Math.round(Math.min((W * 0.74) / cols, H * 0.092));
-  const gw = cols * bcell, gh = rows * bcell;
-  const ox = Math.round((W - gw) / 2), oy = Math.round(H * 0.175);
-
-  // OBUDOWA TACKLEBOXA pod gridem (grid siedzi w środku); zmienia się z poziomem
+  let bcell, gw, gh, ox, oy;
+  if (hasBg) {
+    // wpasuj grid w NAMALOWANE wnętrze tacy (frakcje obrazu 1080x1920 == canvas 9:16, cover 1:1)
+    const ix0 = W * 0.19, ix1 = W * 0.81, iy0 = H * 0.25, iy1 = H * 0.51;
+    const iw2 = ix1 - ix0, ih2 = iy1 - iy0;
+    bcell = Math.floor(Math.min(iw2 / cols, ih2 / rows));
+    gw = cols * bcell; gh = rows * bcell;
+    ox = Math.round(ix0 + (iw2 - gw) / 2);
+    oy = Math.round(iy0 + (ih2 - gh) / 2);
+    // malowany box JEST obudową — nie rysujemy drawTacklebox
+  } else {
+    bcell = Math.round(Math.min((W * 0.74) / cols, H * 0.092));
+    gw = cols * bcell; gh = rows * bcell;
+    ox = Math.round((W - gw) / 2); oy = Math.round(H * 0.175);
+    const p = Math.round(bcell * 0.34);
+    drawTacklebox(ctx, ox - p, oy - p, gw + 2 * p, gh + 2 * p, tb); // rysowana obudowa gdy brak tła
+  }
   const pad = Math.round(bcell * 0.34);
-  drawTacklebox(ctx, ox - pad, oy - pad, gw + 2 * pad, gh + 2 * pad, tb);
 
-  // 1) ramki wszystkich komórek (wewnętrzna taca)
+  // 1) komórki jako wcięte wnęki tackleboxa. Z malowanym tłem — subtelnie (drewno już jest);
+  //    bez tła — rysujemy też drewnianą tacę pod spodem. Grid skaluje się do tieru i UI.
+  if (!hasBg) fillRR(ctx, ox - 4, oy - 4, gw + 8, gh + 8, 8, 'rgba(46,30,16,0.6)');
+  const wellCol = hasBg ? 'rgba(20,13,7,0.32)' : 'rgba(18,12,7,0.62)';
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    fillRR(ctx, ox + c * bcell + 2, oy + r * bcell + 2, bcell - 4, bcell - 4, 6, 'rgba(8,20,30,0.5)');
-    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 2; ctx.strokeRect(ox + c * bcell, oy + r * bcell, bcell, bcell);
+    const cxp = ox + c * bcell, cyp = oy + r * bcell;
+    fillRR(ctx, cxp + 3, cyp + 3, bcell - 6, bcell - 6, 6, wellCol);                  // wcięta wnęka
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2;                           // cień górnej-lewej krawędzi (głębia)
+    ctx.beginPath(); ctx.moveTo(cxp + 4, cyp + bcell - 5); ctx.lineTo(cxp + 4, cyp + 4); ctx.lineTo(cxp + bcell - 5, cyp + 4); ctx.stroke();
+    ctx.save(); ctx.globalAlpha = 0.5; rrPath(ctx, cxp + 2, cyp + 2, bcell - 4, bcell - 4, 6); // listwa (ciepła krawędź wnęki)
+    ctx.strokeStyle = tb.trim; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
   }
   // 2) itemy — każdy RAZ, rozciągnięty na swój footprint (slots×1). Pomijamy aktualnie przeciągany.
   const dragOrigin = s.bpDrag ? itemOrigin(s.grid, s.bpDrag.fromIdx) : -1;
