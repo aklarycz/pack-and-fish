@@ -13,11 +13,16 @@ function removeFish(s, f) {
   if (i >= 0) s.fish.splice(i, 1);
 }
 
-// Tworzy rybę danego typu i pozycjonuje ją (z boku lub z dołu, poniżej pasma haka). Wspólne dla ławicy i bossa.
-function spawnFish(s, type, effDepthM, rng) {
-  const spawnTop = WORLD.hookMaxY + 50;
+// Tworzy rybę danego typu i pozycjonuje ją. boss=true -> wyłania się z DOŁU ekranu (dolne ~18%),
+// środek-ish (gracz nurkuje po niego). Zwykłe ryby: z boku (poniżej pasma haka) lub z dołu.
+function spawnFish(s, type, effDepthM, rng, boss = false) {
   let fx, fy, fdir;
-  if (rng() < 0.75) {
+  if (boss) {
+    fx = WORLD.hookMinX + (0.25 + rng() * 0.5) * (WORLD.hookMaxX - WORLD.hookMinX); // środkowa część
+    fy = s.depthPx + WORLD.H * (0.82 + rng() * 0.15);                               // dolne ~18%
+    fdir = fx < WORLD.W / 2 ? 1 : -1;
+  } else if (rng() < 0.75) {
+    const spawnTop = WORLD.hookMaxY + 50;
     const left = rng() < 0.5;
     fx = left ? WORLD.hookMinX - 35 : WORLD.hookMaxX + 35;
     fdir = left ? 1 : -1;
@@ -82,7 +87,7 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   if (!s.endless && !s.bossSpawned && s.fishQueue.length === 0 && s.bossCount > 0) {
     s.bossLullT += dt;
     if (s.bossLullT >= BOSS_LULL) {
-      for (let k = 0; k < s.bossCount; k++) spawnFish(s, 'twardziel', effDepthM, rng);
+      for (let k = 0; k < s.bossCount; k++) spawnFish(s, 'twardziel', effDepthM, rng, true); // boss z dołu
       s.bossSpawned = true;
     }
   }

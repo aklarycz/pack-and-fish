@@ -59,8 +59,8 @@ export const RECATCH_LIMIT = 1;        // ile razy odpiętą rybę można zaczep
 export const RECATCH_LOCK = 2.0;       // s bufora po zerwaniu zanim ryba może znów się zaczepić (tarcza widoczna)
 export const ESCAPE_SPEED_SLOW = 35;   // px/s ucieczki po 1. zerwaniu (świat, ku powierzchni)
 export const ESCAPE_SPEED_FAST = 160;  // px/s ucieczki po 2. zerwaniu (bez re-latchu)
-export const LEAVE_SPEED = 60;         // px/s odpływania ryb po dobiciu do dna (wolno = łowialne po drodze)
-export const BOTTOM_GRACE = 5;         // s po dobiciu do dna, w których ryby zachowują się normalnie
+export const LEAVE_SPEED = 45;         // px/s odpływania ryb po dobiciu do dna (wolno = łowialne po drodze)
+export const BOTTOM_GRACE = 8;         // s po dobiciu do dna, w których ryby zachowują się normalnie
                                        // (muskie atakuje/łowialny) ZANIM zaczną odpływać
 export const BOSS_LULL = 2.5;          // s ciszy po opróżnieniu worka regularnego zanim wpłynie boss (muskie)
 
