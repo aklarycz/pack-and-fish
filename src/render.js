@@ -1,6 +1,7 @@
 import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ROCKET_FLIGHT, ARENAS, ARENA_COUNT, AVAILABLE_ARENAS, STAGES_PER_ARENA, INV_COLS, INV_VISIBLE_ROWS, arenaOf, localOf, tackleboxOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
 import { gridItems, itemOrigin, bronzeComponent } from './logic/backpack.js';
+import { isAudioMuted } from './audio.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
 const ASSET_VER = 'b47'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
@@ -581,16 +582,24 @@ function renderHome(ctx, s) {
   ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = `bold ${Math.round(H * 0.015)}px monospace`; ctx.textAlign = 'left';
   ctx.fillText(BUILD, W * 0.02, H * 0.86);
 
-  // przycisk RESET postępu (dev/test) — dwa tapnięcia potwierdzają
-  const rbw = W * 0.30, rbh = H * 0.038, rbx = W * 0.02, rby = H * 0.885;
+  // przycisk RESET postępu (dev/test) — dwa tapnięcia potwierdzają. Lewy, pod nazwą areny.
+  const rbw = W * 0.30, rbh = H * 0.038, rbx = W * 0.02, rby = H * 0.20;
   const resetRect = { x: rbx, y: rby, w: rbw, h: rbh };
   fillRR(ctx, rbx, rby, rbw, rbh, 8, s.resetArm ? 'rgba(154,75,75,0.95)' : 'rgba(14,34,51,0.8)');
   rrPath(ctx, rbx, rby, rbw, rbh, 8); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.stroke();
   ctx.fillStyle = s.resetArm ? '#fff' : 'rgba(207,226,245,0.7)'; ctx.font = `bold ${Math.round(H * 0.017)}px sans-serif`; ctx.textAlign = 'center';
   ctx.fillText(s.resetArm ? 'Na pewno? Tap' : 'Reset postępu', rbx + rbw / 2, rby + rbh * 0.68);
 
+  // przycisk MUZYKA (mute) — symetrycznie po prawej, pod nazwą areny
+  const mbw = W * 0.30, mbh = H * 0.038, mbx = W - mbw - W * 0.02, mby = H * 0.20;
+  const muteRect = { x: mbx, y: mby, w: mbw, h: mbh };
+  fillRR(ctx, mbx, mby, mbw, mbh, 8, 'rgba(14,34,51,0.8)');
+  rrPath(ctx, mbx, mby, mbw, mbh, 8); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = 'rgba(207,226,245,0.7)'; ctx.font = `bold ${Math.round(H * 0.017)}px sans-serif`; ctx.textAlign = 'center';
+  ctx.fillText(isAudioMuted() ? 'Muzyka: wył' : 'Muzyka: wł', mbx + mbw / 2, mby + mbh * 0.68);
+
   ctx.textAlign = 'left';
-  s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest, stageNodes, reset: resetRect };
+  s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest, stageNodes, reset: resetRect, mute: muteRect };
 
   // overlay otwarcia skrzynki — pokazuje IKONĘ otrzymanego itemu + nazwę + opis (gracz musi wiedzieć co dostał)
   if (s.chestReveal) {
@@ -1121,18 +1130,19 @@ function renderDescent(ctx, s, hookX, hookY) {
     const sy = f.y - camY;
     if (sy < -60 || sy > WORLD.H + 60) continue;
     const t = FISH_TYPES[f.type];
+    const rad = t.radius * (f.scale || 1);   // bossy 20% większe (f.scale = 1.2)
     const im = keyedEdge(FISH_SPRITE[f.type]);
     if (im) {
       f._sx = (f._sx === undefined ? f.dir : f._sx + (f.dir - f._sx) * 0.12); // płynne zawracanie (scaleX przez 0)
       const tilt = Math.sin(nowD * 1.6 + (f.phaseX || 0)) * 0.06;             // delikatne kołysanie ciała
-      drawFishSprite(ctx, im, f.x, sy, t.radius, f._sx, 1, tilt, df * 0.7);   // ciemnieje z głębokością
+      drawFishSprite(ctx, im, f.x, sy, rad, f._sx, 1, tilt, df * 0.7);        // ciemnieje z głębokością
     } else {
-      ctx.fillStyle = t.color; ctx.beginPath(); ctx.arc(f.x, sy, t.radius, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = t.color; ctx.beginPath(); ctx.arc(f.x, sy, rad, 0, Math.PI * 2); ctx.fill();
     }
     // tarcza "nieuchwytna" — ryba po zerwaniu, której NIE można teraz zahaczyć: bufor po 1. zerwaniu
     // (recatchLock) lub na stałe po 2. zerwaniu (recatchLeft<=0) aż ucieknie. Niebieski transparentny klosz.
     if (f.state === 'escaped' && ((f.recatchLock || 0) > 0 || (f.recatchLeft || 0) <= 0)) {
-      const rr = t.radius + 6, pulse = 0.5 + 0.5 * Math.sin(nowD * 4);
+      const rr = rad + 6, pulse = 0.5 + 0.5 * Math.sin(nowD * 4);
       ctx.save();
       ctx.beginPath(); ctx.arc(f.x, sy, rr, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(90,170,255,${0.14 + 0.06 * pulse})`; ctx.fill();
@@ -1141,13 +1151,13 @@ function renderDescent(ctx, s, hookX, hookY) {
     }
     // wskaźnik HP — na zaczepionej ORAZ na namierzonej przez rakietnicę (widać ubywanie hp).
     if (f.state === 'latched' || f.marked) {
-      const w = t.radius * 2;
-      ctx.fillStyle = '#000'; ctx.fillRect(f.x - t.radius, sy - t.radius - 14, w, 5);
-      ctx.fillStyle = '#ff5d5d'; ctx.fillRect(f.x - t.radius, sy - t.radius - 14, w * Math.max(0, f.hp / f.hpMax), 5);
+      const w = rad * 2;
+      ctx.fillStyle = '#000'; ctx.fillRect(f.x - rad, sy - rad - 14, w, 5);
+      ctx.fillStyle = '#ff5d5d'; ctx.fillRect(f.x - rad, sy - rad - 14, w * Math.max(0, f.hp / f.hpMax), 5);
     }
     // mark celownika rakietnicy — czerwony narożnikowy reticle (cel namierzony przez wyrzutnię)
     if (f.marked) {
-      const rr = t.radius + 6, k = rr * 0.5, sp = nowD * 2.5;
+      const rr = rad + 6, k = rr * 0.5, sp = nowD * 2.5;
       ctx.save(); ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 2.5;
       ctx.translate(f.x, sy); ctx.rotate(sp * 0.0); // narożniki
       for (const [sxn, syn] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {

@@ -34,6 +34,7 @@ function spawnFish(s, type, effDepthM, rng, boss = false) {
   }
   const f = createFish(type, effDepthM, fx, rng);
   f.y = fy; f.dir = fdir;
+  if (boss) f.scale = 1.2;   // boss 20% większy od normalnego odpowiednika (wizual + hitbox)
   s.fish.push(f);
 }
 
@@ -138,7 +139,7 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     const canLatch = (f.state === 'patrol' || f.state === 'aggro' || f.state === 'leaving') ||
                      (f.state === 'escaped' && f.recatchLeft > 0 && (f.recatchLock || 0) <= 0);
     if (s.latched.length < s.hook.maxLatch && canLatch && s.latched.indexOf(f) < 0) {
-      const r = FISH_TYPES[f.type].radius;
+      const r = FISH_TYPES[f.type].radius * (f.scale || 1);
       if (Math.hypot(f.x - hookX, f.y - hookWorldY) <= r + 8) {
         f.contactT = (f.contactT || 0) + dt;
         if (f.contactT >= GRAB_DELAY) { startLatch(f); s.latched.push(f); }

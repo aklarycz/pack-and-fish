@@ -3,6 +3,7 @@ import { createGame, placeHook, placeAccessory, placeAccessoryAt, selectAccessor
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
+import { startAudio, setTrack, setUnderwaterBoss, restartUnderwater, toggleMute, audioUpdate } from './audio.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -47,7 +48,7 @@ function cellAt(gi, x, y) {
 
 attachInput(canvas, {
   onPointerDown(x, y) {
-    if (s.splash) { if (hit(s._splashBtn, x, y)) loginGuest(s); return; } // ekran startowy: tylko przycisk Guest
+    if (s.splash) { if (hit(s._splashBtn, x, y)) { loginGuest(s); startAudio('home'); } return; } // Guest + odblokuj muzykę (gest)
     if (s.mode === 'HOME') {
       if (s.chestReveal) { dismissChest(s); return; }  // tap zamyka reveal skrzynki
       const h = s._home;
@@ -58,6 +59,7 @@ attachInput(canvas, {
         return;
       }
       s.resetArm = false;                                  // tap gdziekolwiek indziej rozbraja
+      if (h.mute && hit(h.mute, x, y)) { toggleMute(); return; } // przełącz muzykę
       if (h.chest && hit(h.chest, x, y)) { openChest(s); return; }
       if (hit(h.left, x, y)) { arenaMove(s, -1); return; }   // strzałki = zmiana ARENY
       if (hit(h.right, x, y)) { arenaMove(s, 1); return; }
@@ -134,6 +136,7 @@ attachInput(canvas, {
 });
 
 let last = 0;
+let prevUwBoss = false; // poprzedni stan "boss na descencie" (do wykrycia rising edge dla cue muzyki)
 function loop(ts) {
   const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0;
   last = ts;
@@ -150,6 +153,13 @@ function loop(ts) {
   }
   if (s.mode === 'END') s.endElapsed = (s.endElapsed || 0) + dt; // beat przed pokazaniem podsumowania
   stepDescent(s, hookX, hookY, dt);
+  // muzyka; underwater przyspiesza już w ~2s zapowiedzi bossa (lull) i restartuje się od początku (cue)
+  const uwBoss = s.mode === 'DESCENT' && s.bossCount > 0 && (s.bossSpawned || s.bossLullT > 0);
+  if (uwBoss && !prevUwBoss) restartUnderwater();   // rising edge: zagraj od początku tuż przed bossem
+  prevUwBoss = uwBoss;
+  setTrack(s.mode === 'DESCENT' ? 'underwater' : 'home');
+  setUnderwaterBoss(uwBoss);
+  audioUpdate(dt);
   render(ctx, s, hookX, hookY);
   requestAnimationFrame(loop);
 }
