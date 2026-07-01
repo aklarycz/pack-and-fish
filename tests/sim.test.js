@@ -71,16 +71,75 @@ test('rocket locks nearest target and keeps the mark (does not switch)', () => {
   if (s.fish.includes(near)) assert.equal(s.rocketTarget, near);
 });
 
-test('durability: muskie (atk>dur) zdziera pasek -> 3 serca -> game over, NIE złowiony bazowym sprzętem', () => {
+test('durability: muskie zrywa się po jednym pasku -> -1 serce, ryba escaped z zachowanym HP', () => {
   const s = started();                 // brąz: dur 6, atk haka 4
   s.fishQueue = [];
   const hookX = 200, hwy = s.depthPx + HOOK_Y;
-  s.fish.push({ type: 'twardziel', x: hookX, y: hwy, hp: 48, hpMax: 48, state: 'aggro', dir: 1, bubbleY: 0 });
+  const muskie = { type: 'twardziel', x: hookX, y: hwy, hp: 48, hpMax: 48, state: 'aggro', dir: 1, bubbleY: 0 };
+  s.fish.push(muskie);
   let safety = 0;
-  while (s.mode === 'DESCENT' && safety++ < 3000) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
-  assert.equal(s.mode, 'END');
-  assert.equal(s.lives, 0);
-  assert.equal(s.stunned, 0);          // muskie nie złowiony — bramka na upgrade
+  while (s.lives === 3 && safety++ < 3000) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.lives, 2);                       // dokładnie JEDNO serce (nie 3)
+  assert.equal(muskie.state, 'escaped');          // odpięty, nie wisi dalej
+  assert.equal(s.latched.includes(muskie), false);
+  assert.ok(muskie.hp > 0 && muskie.hp < 48);     // nie złowiony, ale oberwał
+  assert.equal(s.mode, 'DESCENT');                // gra trwa
+});
+
+test('durability: dobicie drenującej ryby przed zerwaniem odnawia pasek, bez utraty serca', () => {
+  const s = started();
+  s.fishQueue = [];
+  const hookX = 200, hwy = s.depthPx + HOOK_Y;
+  s.durability = s.durabilityMax - 1;             // pasek nadszarpnięty
+  s.fish.push({ type: 'twardziel', x: hookX, y: hwy, hp: 2, hpMax: 48, state: 'aggro', dir: 1, bubbleY: 0 });
+  let safety = 0;
+  while (s.stunned === 0 && safety++ < 200) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.stunned, 1);                     // złowiony (hp 2, atk 4)
+  assert.equal(s.lives, 3);                       // bez utraty serca
+  assert.equal(s.durability, s.durabilityMax);    // pasek odnowiony do maksa
+});
+
+test('zerwana ryba re-latchuje raz na kontakt i kontynuuje od swojego HP', () => {
+  const s = started();
+  s.fishQueue = [];
+  const hookX = 200, hwy = s.depthPx + HOOK_Y;
+  const f = { type: 'twardziel', x: hookX, y: hwy, hp: 20, hpMax: 48,
+              state: 'escaped', dir: 1, bubbleY: 0, breakoffs: 1, recatchLeft: 1, recatchLock: 0, escapeFast: false };
+  s.fish.push(f);
+  let safety = 0;
+  while (f.state !== 'latched' && safety++ < 100) stepDescent(s, hookX, HOOK_Y, 0.1, () => 0.5);
+  assert.equal(f.state, 'latched');
+  assert.ok(s.latched.includes(f));
+  assert.ok(f.hp <= 20);                            // nie zresetowane do 48
+});
+
+test('po drugim zerwaniu ryba ucieka szybko i nie da się jej złapać', () => {
+  const s = started();
+  s.fishQueue = [];
+  const hookX = 200, hwy = s.depthPx + HOOK_Y;
+  const f = { type: 'twardziel', x: hookX, y: hwy, hp: 48, hpMax: 48,
+              state: 'escaped', dir: 1, bubbleY: 0, breakoffs: 1, recatchLeft: 1, recatchLock: 0, escapeFast: false };
+  s.fish.push(f);
+  let safety = 0;
+  while (f.breakoffs < 2 && safety++ < 5000) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(f.breakoffs, 2);
+  assert.equal(f.escapeFast, true);
+  assert.equal(f.recatchLeft, 0);
+  for (let i = 0; i < 30; i++) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.latched.includes(f), false);       // brak ponownego chwytu
+});
+
+test('jeden muskie kosztuje maksymalnie 2 serca, potem znika z łowiska', () => {
+  const s = started();
+  s.fishQueue = [];
+  const hookX = 200, hwy = s.depthPx + HOOK_Y;
+  const f = { type: 'twardziel', x: hookX, y: hwy, hp: 9999, hpMax: 9999, state: 'aggro', dir: 1, bubbleY: 0 };
+  s.fish.push(f);
+  let safety = 0;
+  while (s.fish.includes(f) && s.mode === 'DESCENT' && safety++ < 20000) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.fish.includes(f), false);          // muskie zniknął
+  assert.ok(s.lives >= 1);                           // NIE odebrał 3. serca
+  assert.equal(s.mode, 'DESCENT');
 });
 
 test('durability: słaba ryba (atk<=dur) NIE drenuje paska ani żyć', () => {

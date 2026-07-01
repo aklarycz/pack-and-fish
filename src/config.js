@@ -53,6 +53,13 @@ export const STARTER_HOOK = {
 export const DRAIN_K = 0.42;
 export const GRAB_DELAY = 0.15; // s kontaktu zanim ryba się zaczepi (pozwala odprowadzić hak od muskie)
 
+// Zerwanie żyłki: ryba drenująca pasek, której nie dobito w obrębie JEDNEGO paska, odpada z haka
+// (state 'escaped') i ucieka. Można ją zaczepić RECATCH_LIMIT razy ponownie; potem ucieka szybko.
+export const RECATCH_LIMIT = 1;        // ile razy odpiętą rybę można zaczepić ponownie
+export const RECATCH_LOCK = 0.8;       // s bufora po zerwaniu zanim ryba może znów się zaczepić
+export const ESCAPE_SPEED_SLOW = 35;   // px/s ucieczki po 1. zerwaniu (świat, ku powierzchni)
+export const ESCAPE_SPEED_FAST = 160;  // px/s ucieczki po 2. zerwaniu (bez re-latchu)
+
 // Akcesoria. `slots` = ile komórek gridu (poziomo) zajmuje item — tacklebox 3×3 = 9 slotów
 // pojemności, więc itemy wieloslotowe to wybór builda. `mount` = jak rysuje się na żyłce:
 // 'hook' (kotwica/brąz: terminalny hak na dole) lub 'side' (gadżet na ramieniu ciężarka).
@@ -235,6 +242,11 @@ export const ARENAS = [
     base: { plotka: 10, sredniak: 16, muskie: 3, muskieFrom: 0, offsetM: 25, depthCap: 50, spawnStart: 1.6, spawnMin: 1.1, perM: 0.01 } },
 ];
 export const ARENA_COUNT = ARENAS.length;
+
+// Ile aren jest realnie dostępnych (mają content). Reszta zablokowana w nawigacji.
+// Zwiększ, gdy dojdą areny 2/3. PLAYABLE_STAGES = górna granica nawigacji/odblokowań.
+export const AVAILABLE_ARENAS = 1;
+export const PLAYABLE_STAGES = AVAILABLE_ARENAS * STAGES_PER_ARENA;
 
 // Płaska lista wszystkich stage'y (index globalny = arena*10 + lokalny).
 export const STAGES = ARENAS.flatMap((a, idx) => buildArenaStages(a.base, a, idx));

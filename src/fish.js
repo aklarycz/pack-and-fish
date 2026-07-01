@@ -1,4 +1,4 @@
-import { FISH_TYPES, WORLD } from './config.js';
+import { FISH_TYPES, WORLD, ESCAPE_SPEED_SLOW, ESCAPE_SPEED_FAST } from './config.js';
 
 // Ryba może wypłynąć tylko TROCHĘ poza pasmo haka — i tak musi zostać w zasięgu połowu
 // (clamp na końcu updateFish), żeby uciekająca ryba nie zniknęła z ekranu poza zasięgiem.
@@ -13,7 +13,15 @@ export function inAggroRange(fish, hookX, hookWorldY, types = FISH_TYPES) {
 
 // Aktualizuje pozycję ryby. hookWorldY = depthPx + hookStartY (świat). speedMul z rampy.
 export function updateFish(fish, hookX, hookWorldY, dt, speedMul, rng = Math.random) {
-  if (fish.state === 'stunned' || fish.state === 'escaped' || fish.state === 'latched') return;
+  if (fish.state === 'stunned' || fish.state === 'latched') return;
+  if (fish.state === 'escaped') {
+    if (fish.recatchLock > 0) fish.recatchLock -= dt;
+    const sp = fish.escapeFast ? ESCAPE_SPEED_FAST : ESCAPE_SPEED_SLOW;
+    fish.y -= sp * dt;                                    // ku powierzchni (świat y maleje -> znika górą)
+    fish.x += (fish.x < hookX ? -1 : 1) * sp * 0.4 * dt;  // lekki dryf od haka
+    fish.x = Math.max(WORLD.hookMinX - EDGE_MARGIN, Math.min(WORLD.hookMaxX + EDGE_MARGIN, fish.x));
+    return;
+  }
   const t = FISH_TYPES[fish.type];
   const speed = t.speed * speedMul;
   fish.t = (fish.t || 0) + dt;

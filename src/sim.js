@@ -1,5 +1,5 @@
 // Czysta symulacja jednej klatki descentu (bez DOM). main.js woła to w pętli rAF.
-import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY } from './config.js';
+import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY, RECATCH_LIMIT, RECATCH_LOCK } from './config.js';
 
 const CLEAR_DELAY = 3.5; // s po wyczyszczeniu worka zanim odpali ekran END (gracz musi zauważyć)
 import { difficultyAt } from './logic/ramp.js';
@@ -11,6 +11,20 @@ import { addDepth, registerStun, registerEscape, descentCleared } from './state.
 function removeFish(s, f) {
   const i = s.fish.indexOf(f);
   if (i >= 0) s.fish.splice(i, 1);
+}
+
+// Zrywa rybę z haka: usuwa z latched, oznacza jako escaped. Pierwsze zerwanie -> wolna ucieczka +
+// jednorazowy re-latch (po buforze); kolejne -> szybka ucieczka bez możliwości ponownego chwytu.
+function breakOff(s, f) {
+  const li = s.latched.indexOf(f);
+  if (li >= 0) s.latched.splice(li, 1);
+  f.breakoffs = (f.breakoffs || 0) + 1;
+  f.state = 'escaped';
+  if (f.breakoffs > RECATCH_LIMIT) {
+    f.recatchLeft = 0; f.escapeFast = true; f.recatchLock = 0;
+  } else {
+    f.recatchLeft = RECATCH_LIMIT - f.breakoffs + 1; f.escapeFast = false; f.recatchLock = RECATCH_LOCK;
+  }
 }
 
 export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
@@ -74,9 +88,11 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     f.x = hookX + (li - (s.latched.length - 1) / 2) * 50;
     f.y = hookWorldY + 4;
     if (tickLatch(f, s.hook.atk, dt) === 'stunned') {
+      const straining = (FISH_TYPES[f.type].atk || 0) > s.hook.dur;
       registerStun(s, FISH_TYPES[f.type]);
       f.bubbleY = f.y; s.bubbles.push(f);
       removeFish(s, f); s.latched.splice(li, 1);
+      if (straining && s.mode === 'DESCENT') s.durability = s.durabilityMax; // odnowa po złowieniu drenującej
     }
   }
 
@@ -91,15 +107,24 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   if (drain > 0) {
     s.durability -= drain * dt;
     if (s.durability <= 0) {
+      // najsilniejsza drenująca ryba odpada z haka (zerwanie żyłki)
+      let victim = null, best = -Infinity;
+      for (const f of s.latched) {
+        const A = FISH_TYPES[f.type].atk || 0;
+        if (A > s.hook.dur && A > best) { best = A; victim = f; }
+      }
       registerEscape(s);                                       // −1 serce (może zakończyć grę)
-      if (s.mode === 'DESCENT') s.durability = s.durabilityMax; // odnów pasek, walcz dalej
+      if (s.mode === 'DESCENT') s.durability = s.durabilityMax; // odnów pasek
+      if (victim) breakOff(s, victim);                          // ryba odpada i ucieka
     }
   }
 
   // ruch ryb + wykrycie kontaktu. Zaczepienie po GRAB_DELAY ciągłego kontaktu (można odprowadzić hak).
   for (const f of s.fish) {
     updateFish(f, hookX, hookWorldY, dt, diff.speedMul);
-    if (s.latched.length < s.hook.maxLatch && (f.state === 'patrol' || f.state === 'aggro') && s.latched.indexOf(f) < 0) {
+    const canLatch = (f.state === 'patrol' || f.state === 'aggro') ||
+                     (f.state === 'escaped' && f.recatchLeft > 0 && (f.recatchLock || 0) <= 0);
+    if (s.latched.length < s.hook.maxLatch && canLatch && s.latched.indexOf(f) < 0) {
       const r = FISH_TYPES[f.type].radius;
       if (Math.hypot(f.x - hookX, f.y - hookWorldY) <= r + 8) {
         f.contactT = (f.contactT || 0) + dt;

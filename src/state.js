@@ -1,5 +1,5 @@
-import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf, tackleboxOf } from './config.js';
-import { createGrid, placeItem, findFreeRun, itemOrigin, gridItems } from './logic/backpack.js';
+import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC, ARENA_COUNT, STAGES_PER_ARENA, AVAILABLE_ARENAS, PLAYABLE_STAGES, arenaOf, localOf, tackleboxOf } from './config.js';
+import { createGrid, placeItem, findFreeRun, findFreeRunAvoiding, itemOrigin, gridItems } from './logic/backpack.js';
 import { computeScore, computeStars } from './logic/scoring.js';
 import { loadProgress, saveProgress } from './persistence.js';
 
@@ -83,16 +83,17 @@ function persist(s) {
 
 // --- nawigacja Home ---
 export function carouselMove(s, dir) {
-  s.stageIndex = Math.max(0, Math.min(STAGES.length - 1, s.stageIndex + dir));
+  s.stageIndex = Math.max(0, Math.min(PLAYABLE_STAGES - 1, s.stageIndex + dir));
 }
 // strzałki u góry: zmiana ARENY (skok o 10), zachowując lokalny stage. Zmienia scenę Home.
+// Clamp do AVAILABLE_ARENAS — areny bez contentu (2+) są zablokowane.
 export function arenaMove(s, dir) {
-  const arena = Math.max(0, Math.min(ARENA_COUNT - 1, arenaOf(s.stageIndex) + dir));
+  const arena = Math.max(0, Math.min(AVAILABLE_ARENAS - 1, arenaOf(s.stageIndex) + dir));
   s.stageIndex = arena * STAGES_PER_ARENA + localOf(s.stageIndex);
 }
 // pasek na dole: wybór konkretnego stage (global index) w obrębie bieżącej areny.
 export function selectStageIndex(s, idx) {
-  s.stageIndex = Math.max(0, Math.min(STAGES.length - 1, idx));
+  s.stageIndex = Math.max(0, Math.min(PLAYABLE_STAGES - 1, idx));
 }
 export function stageUnlocked(s, i = s.stageIndex) {
   return !!(s.progress.stages[i] && s.progress.stages[i].unlocked);
@@ -110,7 +111,7 @@ export function returnHome(s) {
   // po ZALICZENIU stage'a przeskocz na kolejny odblokowany (gracz od razu gotowy do gry dalej)
   if (s.lastResult && s.lastResult.cleared) {
     const next = s.stageIndex + 1;
-    if (next < STAGES.length && stageUnlocked(s, next)) s.stageIndex = next;
+    if (next < PLAYABLE_STAGES && stageUnlocked(s, next)) s.stageIndex = next;
   }
   s.mode = 'HOME'; s.cast = null; s.reveal = null;
   s.lastResult = null;
@@ -131,7 +132,9 @@ export function placeHook(s, col, row) {
 export function placeAccessory(s, itemId) {
   if (!s.progress.inventory[itemId]) return false;
   const w = (ITEMS[itemId] && ITEMS[itemId].slots) || 1;
-  const idx = findFreeRun(s.grid, w);
+  const idx = (itemId === 'anchor' && !s.progress.tutAnchorDone)
+    ? findFreeRunAvoiding(s.grid, w, 'bronze')      // tutorial: kotwica z dala od haka -> gracz musi przeciągnąć
+    : findFreeRun(s.grid, w);
   if (idx < 0) return false;                       // brak miejsca na item tej szerokości
   for (let k = 0; k < w; k++) s.grid.cells[idx + k] = itemId;
   s.progress.inventory[itemId] -= 1;
@@ -268,7 +271,7 @@ function finishDescent(s, reason = 'fail') {
     st.bestScore = Math.max(st.bestScore, s.score);
     st.stars = Math.max(st.stars, s.stars);
     const next = s.stageIndex + 1;
-    if (s.stars >= 1 && next < STAGES.length && !s.progress.stages[next].unlocked) {
+    if (s.stars >= 1 && next < PLAYABLE_STAGES && !s.progress.stages[next].unlocked) {
       s.progress.stages[next].unlocked = true; newUnlock = true;
     }
     if (s.stars >= 1 && !st.chestClaimed) {          // skrzynka JEDNORAZOWA: clear z ≥1★

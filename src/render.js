@@ -1,4 +1,4 @@
-import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ROCKET_FLIGHT, ARENAS, ARENA_COUNT, STAGES_PER_ARENA, arenaOf, localOf, tackleboxOf } from './config.js';
+import { WORLD, FISH_TYPES, BACKPACK, STARTER_HOOK, STAGES, ITEMS, RARITY, CAST_DUR, CAST_ANIM, ROCKET_FLIGHT, ARENAS, ARENA_COUNT, AVAILABLE_ARENAS, STAGES_PER_ARENA, arenaOf, localOf, tackleboxOf } from './config.js';
 import { computeStars } from './logic/scoring.js';
 import { gridItems, itemOrigin } from './logic/backpack.js';
 
@@ -442,7 +442,7 @@ function renderHome(ctx, s) {
   homeLeft = { x: W * 0.04, y: arCy - ar, w: ar * 2, h: ar * 2 };
   homeRight = { x: W - W * 0.04 - ar * 2, y: arCy - ar, w: ar * 2, h: ar * 2 };
   navArrow(ctx, homeLeft.x + ar, arCy, ar, -1, arena > 0);
-  navArrow(ctx, homeRight.x + ar, arCy, ar, 1, arena < ARENA_COUNT - 1);
+  navArrow(ctx, homeRight.x + ar, arCy, ar, 1, arena < AVAILABLE_ARENAS - 1);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#9fd0ff'; ctx.font = `bold ${Math.round(H * 0.018)}px sans-serif`;
   ctx.fillText(`ARENA ${A.id}`, cx, H * 0.108);

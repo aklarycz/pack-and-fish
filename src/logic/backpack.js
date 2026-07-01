@@ -38,6 +38,29 @@ export function itemOrigin(grid, idx) {
   return o;
 }
 
+// Origin pierwszego wolnego ciągu `w` komórek, którego ŻADNA komórka nie sąsiaduje (4-kier.)
+// z komórką zawierającą `avoidId`. Fallback do findFreeRun, gdy taki ciąg nie istnieje.
+export function findFreeRunAvoiding(grid, w, avoidId) {
+  const { cells, cols, rows } = grid;
+  const adjToAvoid = (idx) => {
+    const r = Math.floor(idx / cols), c = idx % cols, nb = [];
+    if (r > 0) nb.push(idx - cols); if (r < rows - 1) nb.push(idx + cols);
+    if (c > 0) nb.push(idx - 1); if (c < cols - 1) nb.push(idx + 1);
+    return nb.some(n => cells[n] === avoidId);
+  };
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c + w <= cols; c++) {
+      let ok = true;
+      for (let k = 0; k < w; k++) {
+        const idx = r * cols + c + k;
+        if (cells[idx] !== null || adjToAvoid(idx)) { ok = false; break; }
+      }
+      if (ok) return r * cols + c;
+    }
+  }
+  return findFreeRun(grid, w);
+}
+
 // Lista itemów w gridzie: {id, idx (origin), w}. Każdy item raz (nie per-komórka).
 export function gridItems(grid, ITEMS) {
   const out = [], { cells, cols, rows } = grid;

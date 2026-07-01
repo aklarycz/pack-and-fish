@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, placeHook, startStage, addDepth, registerStun, registerEscape,
-  carouselMove, openBackpack, closeBackpack, stageUnlocked, descentCleared,
+  carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, stageUnlocked, descentCleared,
   openChest, placeAccessory, moveItem, computeHookStats, loginGuest, returnHome,
 } from '../src/state.js';
-import { STARTER_HOOK, FISH_TYPES, WORLD, STAGES } from '../src/config.js';
+import { STARTER_HOOK, FISH_TYPES, WORLD, STAGES, STAGES_PER_ARENA, PLAYABLE_STAGES } from '../src/config.js';
 
 test('new game: HOME, stage 0 unlocked, rest locked, rusty hook pre-equipped (default, atk1)', () => {
   const s = createGame();
@@ -26,12 +26,36 @@ test('new game shows splash; loginGuest enters the game', () => {
   assert.equal(s.mode, 'HOME');
 });
 
-test('carouselMove clamps to stage range', () => {
+test('carouselMove clampuje do grywalnej areny 1 (0..9)', () => {
   const s = createGame();
   carouselMove(s, -1); assert.equal(s.stageIndex, 0);
-  carouselMove(s, 1); assert.equal(s.stageIndex, 1);
-  for (let i = 0; i < STAGES.length + 5; i++) carouselMove(s, 1);
-  assert.equal(s.stageIndex, STAGES.length - 1);
+  for (let i = 0; i < 50; i++) carouselMove(s, 1);
+  assert.equal(s.stageIndex, PLAYABLE_STAGES - 1);   // 9, nie STAGES.length-1
+});
+
+test('arenaMove nie wychodzi poza arenę 1 (brak contentu aren 2+)', () => {
+  const s = createGame();
+  arenaMove(s, 1);
+  assert.ok(s.stageIndex < STAGES_PER_ARENA);
+  arenaMove(s, 5);
+  assert.ok(s.stageIndex < STAGES_PER_ARENA);
+});
+
+test('selectStageIndex clampuje do areny 1', () => {
+  const s = createGame();
+  selectStageIndex(s, 25);
+  assert.equal(s.stageIndex, PLAYABLE_STAGES - 1);
+});
+
+test('stage 10 nie odblokowuje areny 2, returnHome nie zawija', () => {
+  const s = createGame();
+  s.stageIndex = PLAYABLE_STAGES - 1;                       // stage 10 (idx 9)
+  s.progress.stages[s.stageIndex].unlocked = true;
+  startStage(s);
+  s.stunnedPoints = 300; descentCleared(s);                 // clear z gwiazdkami
+  returnHome(s);
+  assert.equal(s.stageIndex, PLAYABLE_STAGES - 1);          // został na stage 10 (brak skoku)
+  assert.equal(!!(s.progress.stages[PLAYABLE_STAGES] && s.progress.stages[PLAYABLE_STAGES].unlocked), false);
 });
 
 test('backpack open/close toggles mode', () => {
@@ -94,8 +118,21 @@ test('anchor connected to bronze hook raises maxLatch to 2', () => {
   const s = createGame();                          // bronze in inventory
   placeAccessory(s, 'bronze');                     // index 0
   s.progress.inventory.anchor = 1;
-  assert.equal(placeAccessory(s, 'anchor'), true); // auto first free = index 1, adjacent to bronze
+  s.progress.tutAnchorDone = true;                 // po tutorialu: auto-placement w pierwszy wolny (obok)
+  assert.equal(placeAccessory(s, 'anchor'), true); // index 1, sąsiaduje z brązem
   assert.equal(s.hook.maxLatch, 2);                // połączone → +1 ryba
+});
+
+test('tutorialowa kotwica ląduje z dala od brązowego haka (wymusza przeciągnięcie)', () => {
+  const s = createGame();
+  placeAccessory(s, 'bronze');                      // index 0
+  s.progress.inventory.anchor = 1;
+  assert.equal(s.progress.tutAnchorDone, false);    // tutorial trwa
+  assert.equal(placeAccessory(s, 'anchor'), true);
+  const ai = s.grid.cells.indexOf('anchor');
+  assert.notEqual(ai, 1);                           // nie w prawo od brązu (idx 0)
+  assert.notEqual(ai, 3);                           // nie pod brązem
+  assert.equal(s.hook.maxLatch, 1);                 // niepołączone -> gracz musi przeciągnąć
 });
 
 test('raw atk always counts; +fish (maxLatch) only when anchor connected to bronze hook', () => {
