@@ -210,6 +210,32 @@ test('balans: muskie z Odważnikiem (stage 4) łowialny bez utraty serca', () =>
   assert.equal(s.lives, 3);                         // bez utraty serca
 });
 
+test('stage kończy się po descentM gdy ryby wypłyną górą (nie od razu przy dnie)', () => {
+  const s = started();
+  s.descentM = 5;                                   // krótkie opadanie
+  s.fishQueue = ['plotka', 'plotka', 'plotka'];     // worek NADAL pełny
+  const straggler = { type: 'plotka', x: 200, y: s.depthPx + 300, hp: 9999, hpMax: 9999, state: 'patrol', dir: 1, bubbleY: 0 };
+  s.fish.push(straggler);                            // niezłowiona ryba na ekranie
+  let safety = 0, endedAtDepth = -1;
+  while (s.mode === 'DESCENT' && safety++ < 8000) {
+    stepDescent(s, 200, HOOK_Y, 1 / 60, () => 0.5);
+    if (endedAtDepth < 0 && s.fish.length === 0) endedAtDepth = s.depthPx / WORLD.pxPerMeter; // moment opróżnienia łowiska
+  }
+  assert.equal(s.mode, 'END');
+  assert.ok(s.depthPx / WORLD.pxPerMeter >= 5);     // dobił do dna
+  assert.ok(endedAtDepth >= 5);                      // łowisko opróżniło się DOPIERO przy/za dnem (nie wcześniej)
+});
+
+test('pusty worek NIE kończy stage przedwcześnie (trwa do descentM)', () => {
+  const s = started();
+  s.descentM = 4;
+  s.fishQueue = []; s.fish = []; s.latched = [];     // brak ryb od startu
+  let safety = 0;
+  while (s.mode === 'DESCENT' && safety++ < 5000) stepDescent(s, 200, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.mode, 'END');
+  assert.ok(s.depthPx / WORLD.pxPerMeter >= 4);      // skończył się DOPIERO po głębokości
+});
+
 test('descent runs many steps without throwing and accrues depth', () => {
   const s = started();
   for (let i = 0; i < 400; i++) {

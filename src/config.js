@@ -59,6 +59,9 @@ export const RECATCH_LIMIT = 1;        // ile razy odpiętą rybę można zaczep
 export const RECATCH_LOCK = 2.0;       // s bufora po zerwaniu zanim ryba może znów się zaczepić (tarcza widoczna)
 export const ESCAPE_SPEED_SLOW = 35;   // px/s ucieczki po 1. zerwaniu (świat, ku powierzchni)
 export const ESCAPE_SPEED_FAST = 160;  // px/s ucieczki po 2. zerwaniu (bez re-latchu)
+export const LEAVE_SPEED = 90;         // px/s odpływania ryb po dobiciu do dna (ku krawędzi, za ekran)
+export const BOTTOM_GRACE = 4;         // s po dobiciu do dna, w których ryby zachowują się normalnie
+                                       // (muskie atakuje/łowialny) ZANIM zaczną odpływać
 
 // Akcesoria. `slots` = ile komórek gridu (poziomo) zajmuje item — tacklebox 3×3 = 9 slotów
 // pojemności, więc itemy wieloslotowe to wybór builda. `mount` = jak rysuje się na żyłce:
@@ -175,20 +178,20 @@ export const STAGES_PER_ARENA = 10;
 // Jawna kompozycja Areny 1 (przebalansowane przez game designera — patrz docs/balance-arena1.md):
 // p/s/m = plotka/sredniak/muskie (suma = total: 20,25,...,65). Muskie ramp ⌈stage/2⌉ (1,1,2,2,3,3,4,4,5,5)
 // — łagodniejszy niż dosłowne 1,3,5..., bo muskie są praktycznie niełowialne i 3 naraz = pewna strata żyć.
-// Stage 1: spokojny intro (maxLatch 1, brak kotwicy) — wolny spawn.
-// Stage 2+: gracz ma kotwicę (maxLatch 2) -> GĘSTY spawn (~2× szybszy) + więcej ryb,
-// żeby realnie łapać 2 naraz. Muskie (m) rośnie łagodnie (bramka na wytrzymałość).
+// Stage 1: spokojny intro (maxLatch 1). Stage 2+: kotwica (maxLatch 2). d = descentM (metry = sekundy
+// opadania, bo 1 m/s). Gęstość (spawn) rośnie s1–s5, max płaska s6–s10. Worek ≈ d/spawn (wypełnia opadanie).
+// depthCap wyliczane w buildArenaStages = d + difficultyOffsetM (depth zawsze osiąga sufit).
 const ARENA1_STAGES = [
-  { p: 15, s: 4,  m: 1, cap: 30, spawn: 2.00 },
-  { p: 22, s: 8,  m: 1, cap: 34, spawn: 1.25 },
-  { p: 25, s: 11, m: 2, cap: 38, spawn: 1.15 },
-  { p: 28, s: 14, m: 2, cap: 42, spawn: 1.05 },
-  { p: 30, s: 18, m: 3, cap: 46, spawn: 1.00 },
-  { p: 31, s: 23, m: 3, cap: 50, spawn: 0.95 },
-  { p: 32, s: 27, m: 4, cap: 54, spawn: 0.90 },
-  { p: 33, s: 32, m: 4, cap: 58, spawn: 0.85 },
-  { p: 33, s: 37, m: 5, cap: 62, spawn: 0.80 },
-  { p: 33, s: 43, m: 5, cap: 66, spawn: 0.75 },
+  { p: 15, s: 4,  m: 1, d: 32, spawn: 1.60 },
+  { p: 19, s: 6,  m: 1, d: 36, spawn: 1.40 },
+  { p: 22, s: 9,  m: 2, d: 40, spawn: 1.20 },
+  { p: 28, s: 12, m: 2, d: 44, spawn: 1.05 },
+  { p: 33, s: 17, m: 3, d: 48, spawn: 0.90 },
+  { p: 36, s: 19, m: 3, d: 52, spawn: 0.90 },
+  { p: 37, s: 21, m: 4, d: 56, spawn: 0.90 },
+  { p: 39, s: 24, m: 4, d: 60, spawn: 0.90 },
+  { p: 40, s: 26, m: 5, d: 64, spawn: 0.90 },
+  { p: 42, s: 29, m: 5, d: 68, spawn: 0.90 },
 ];
 
 // Progi gwiazdek wg REALNIE osiągalnego score per epoka sprzętu (nie % teoretycznego maxa).
@@ -210,23 +213,24 @@ function buildArenaStages(base, arena, arenaIndex) {
   for (let i = 0; i < STAGES_PER_ARENA; i++) {
     const globalIndex = arenaIndex * STAGES_PER_ARENA + i;
     const hasRocket = globalIndex >= 2;
-    let plotka, sredniak, muskie, depthCap, start;
+    const difficultyOffsetM = base.offsetM + i * 2;
+    let plotka, sredniak, muskie, descentM, start;
     if (arenaIndex === 0) {
       const c = ARENA1_STAGES[i];
-      plotka = c.p; sredniak = c.s; muskie = c.m; depthCap = c.cap; start = c.spawn;
+      plotka = c.p; sredniak = c.s; muskie = c.m; descentM = c.d; start = c.spawn;
     } else {
       const mult = 1 + i * 0.10;
       plotka = Math.round(base.plotka * mult);
       sredniak = Math.round(base.sredniak * mult);
       muskie = i < base.muskieFrom ? 0 : base.muskie + Math.floor((i - base.muskieFrom) * 0.3);
-      depthCap = base.depthCap + i * 2;
+      descentM = base.descentM + i * 4;
       start = Math.max(base.spawnMin, base.spawnStart - i * 0.05);
     }
+    const depthCap = descentM + difficultyOffsetM;   // depth zawsze osiąga sufit (dobicie do dna)
     const bag = { plotka, sredniak, twardziel: muskie };
-    const difficultyOffsetM = base.offsetM + i * 2;
     stages.push({
       arenaId: arena.id, arenaName: arena.name, bg: arena.bg, no: i + 1,
-      difficultyOffsetM, bag, spawn: { start, min: start, perM: base.perM }, depthCap,
+      difficultyOffsetM, bag, spawn: { start, min: start, perM: base.perM }, depthCap, descentM,
       stars: starThresholds(plotka, sredniak, muskie, depthCap, hasRocket),
     });
   }
@@ -239,9 +243,9 @@ export const ARENAS = [
   { id: 1, name: 'Przybrzeże', bg: 'arena-01', tint: ['#16406e', '#0b2138'],
     base: { plotka: 10, sredniak: 6,  muskie: 1, muskieFrom: 0, offsetM: 0,  depthCap: 30, spawnStart: 2.3, spawnMin: 2.3, perM: 0 } },
   { id: 2, name: 'Toń',        bg: 'arena-02', tint: ['#114b5f', '#06222b'],
-    base: { plotka: 12, sredniak: 10, muskie: 2, muskieFrom: 0, offsetM: 12, depthCap: 40, spawnStart: 1.9, spawnMin: 1.4, perM: 0.008 } },
+    base: { plotka: 12, sredniak: 10, muskie: 2, muskieFrom: 0, offsetM: 12, descentM: 32, spawnStart: 1.9, spawnMin: 1.4, perM: 0.008 } },
   { id: 3, name: 'Głębia',     bg: 'arena-03', tint: ['#2a2a5e', '#0a0a22'],
-    base: { plotka: 10, sredniak: 16, muskie: 3, muskieFrom: 0, offsetM: 25, depthCap: 50, spawnStart: 1.6, spawnMin: 1.1, perM: 0.01 } },
+    base: { plotka: 10, sredniak: 16, muskie: 3, muskieFrom: 0, offsetM: 25, descentM: 40, spawnStart: 1.6, spawnMin: 1.1, perM: 0.01 } },
 ];
 export const ARENA_COUNT = ARENAS.length;
 

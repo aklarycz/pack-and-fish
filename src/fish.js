@@ -1,4 +1,4 @@
-import { FISH_TYPES, WORLD, ESCAPE_SPEED_SLOW, ESCAPE_SPEED_FAST } from './config.js';
+import { FISH_TYPES, WORLD, ESCAPE_SPEED_SLOW, ESCAPE_SPEED_FAST, LEAVE_SPEED } from './config.js';
 
 // Ryba może wypłynąć tylko TROCHĘ poza pasmo haka — i tak musi zostać w zasięgu połowu
 // (clamp na końcu updateFish), żeby uciekająca ryba nie zniknęła z ekranu poza zasięgiem.
@@ -20,6 +20,11 @@ export function updateFish(fish, hookX, hookWorldY, dt, speedMul, rng = Math.ran
     fish.y -= sp * dt;                                    // ku powierzchni (świat y maleje -> znika górą)
     fish.x += (fish.x < hookX ? -1 : 1) * sp * 0.4 * dt;  // lekki dryf od haka
     fish.x = Math.max(WORLD.hookMinX - EDGE_MARGIN, Math.min(WORLD.hookMaxX + EDGE_MARGIN, fish.x));
+    return;
+  }
+  if (fish.state === 'leaving') {          // dno osiągnięte: wypływa KU GÓRZE (powierzchni) i za górny ekran;
+    fish.y -= LEAVE_SPEED * dt;            // przepływa przez zasięg haka -> łowialna po drodze, aż zniknie górą
+    fish.x += Math.sign((hookX ?? fish.x) - fish.x) * 20 * dt; // lekki dryf ku kolumnie haka
     return;
   }
   const t = FISH_TYPES[fish.type];

@@ -1,6 +1,6 @@
 // Zapis postępu w localStorage (gwiazdki/best score/odblokowania + hak).
 // Guard na środowisko bez localStorage (testy Node) — wtedy działa na domyślnych.
-const KEY = 'packfish_progress_v13'; // bump = reset progresu (v13 = przebudowa plecaka: tacka + drag + popup)
+const KEY = 'packfish_progress_v15'; // bump = reset progresu (v15 = wyplywanie ryb na dnie + boss muskie + fix persist tutoriala)
 
 export function defaultProgress(stageCount) {
   const stages = [];
@@ -45,6 +45,7 @@ export function loadProgress(stageCount) {
           prog.gotWeight = !!data.gotWeight;
           prog.tackleboxTier = data.tackleboxTier || 0;
           prog.inventory = data.inventory || {};
+          prog.tutBronzeDone = !!data.tutBronzeDone;
           prog.tutAnchorDone = !!data.tutAnchorDone;
         }
       }

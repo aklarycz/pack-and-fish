@@ -1,7 +1,7 @@
 // Czysta symulacja jednej klatki descentu (bez DOM). main.js woła to w pętli rAF.
-import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY, RECATCH_LIMIT, RECATCH_LOCK } from './config.js';
+import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY, RECATCH_LIMIT, RECATCH_LOCK, BOTTOM_GRACE } from './config.js';
 
-const CLEAR_DELAY = 3.5; // s po wyczyszczeniu worka zanim odpali ekran END (gracz musi zauważyć)
+const CLEAR_DELAY = 1.5; // s po opróżnieniu łowiska przy dnie zanim odpali ekran END (gracz zauważy)
 import { difficultyAt } from './logic/ramp.js';
 import { createFish } from './logic/spawn.js';
 import { startLatch, tickLatch } from './logic/combat.js';
@@ -32,12 +32,13 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   if (s.reveal) return; // kurtyna jeszcze zakrywa/odsłania — hak nie tonie, ryby nie spawnują
   // trudność liczona od głębokości + offsetu stage'a (stage startuje "głębiej")
   const depthM = s.depthPx / WORLD.pxPerMeter + (s.stageOffsetM || 0);
+  const localM = s.depthPx / WORLD.pxPerMeter;   // lokalna głębokość (bez offsetu) = długość opadania
   // TRYB TESTOWY: zamrażamy skalowanie trudności (hp/prędkość ryb) na płytkim poziomie,
   // by ryby były łowialne na DOWOLNEJ testowej głębokości (inaczej hp sumów rośnie w nieskończoność).
   // Realny depthPx (przyciemnianie, score) dalej rośnie normalnie.
   const effDepthM = s.endless ? Math.min(depthM, 10) : depthM;
   const diff = difficultyAt(effDepthM);
-  addDepth(s, s.hook.szybkoscOpadania * dt);
+  if (localM < s.descentM) addDepth(s, s.hook.szybkoscOpadania * dt); // hak przestaje opadać na dnie (descentM)
 
   // spawn — GŁÓWNIE z boków (ryba wpływa poziomo do środka i przecina scenę),
   // część z dołu dla urozmaicenia. Boczny spawn sprawia, że dominującym ruchem
@@ -51,9 +52,8 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     s.fishQueue.push(tt);
   }
   s.spawnTimer -= dt;
-  if (s.spawnTimer <= 0 && s.fishQueue.length > 0) {
+  if (s.spawnTimer <= 0 && s.fishQueue.length > 0 && (s.endless || localM < s.descentM)) {
     const sp = STAGES[s.stageIndex].spawn;
-    const localM = s.depthPx / WORLD.pxPerMeter;
     s.spawnTimer = Math.max(sp.min, sp.start - localM * sp.perM);
     const type = s.fishQueue.shift();   // worek easy->hard
     // WSZYSTKIE ryby pojawiają się PONIŻEJ granicy ruchu haka (hookMaxY) — gracz
@@ -122,7 +122,7 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   // ruch ryb + wykrycie kontaktu. Zaczepienie po GRAB_DELAY ciągłego kontaktu (można odprowadzić hak).
   for (const f of s.fish) {
     updateFish(f, hookX, hookWorldY, dt, diff.speedMul);
-    const canLatch = (f.state === 'patrol' || f.state === 'aggro') ||
+    const canLatch = (f.state === 'patrol' || f.state === 'aggro' || f.state === 'leaving') ||
                      (f.state === 'escaped' && f.recatchLeft > 0 && (f.recatchLock || 0) <= 0);
     if (s.latched.length < s.hook.maxLatch && canLatch && s.latched.indexOf(f) < 0) {
       const r = FISH_TYPES[f.type].radius;
@@ -175,14 +175,23 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     }
   }
 
-  // bańki w górę + sprzątanie poza ekranem (zaczepione zostają)
+  // DNO osiągnięte (descentM): najpierw OKNO ŁASKI (BOTTOM_GRACE) — ryby zachowują się normalnie,
+  // muskie atakuje i jest łowialny. Dopiero po nim pozostałe niezłowione ODPŁYWAJĄ (leaving).
+  if (localM >= s.descentM) {
+    s.bottomT += dt;
+    if (s.bottomT >= BOTTOM_GRACE) {
+      for (const f of s.fish) if (f.state === 'patrol' || f.state === 'aggro') f.state = 'leaving';
+    }
+  } else s.bottomT = 0;
+
+  // bańki w górę + sprzątanie poza ekranem (zaczepione zostają; odpływające wypływają górą)
   for (const b of s.bubbles) b.bubbleY -= 90 * dt;
   s.bubbles = s.bubbles.filter(b => b.bubbleY - s.depthPx > -40);
-  s.fish = s.fish.filter(f => s.latched.indexOf(f) >= 0 || (f.y - s.depthPx) > -160);
+  s.fish = s.fish.filter(f => s.latched.indexOf(f) >= 0 || (f.y - s.depthPx) > -160); // znikają dopiero górą
 
-  // pula wyczerpana i wszystkie ryby zeszły/rozstrzygnięte -> po CLEAR_DELAY łowisko wyczyszczone
-  // (opóźnienie, by gracz zauważył koniec; w trybie testowym worek nigdy pusty, więc nie odpala)
-  if (!s.endless && s.fishQueue.length === 0 && s.fish.length === 0 && s.latched.length === 0) {
+  // Stage kończy się DOPIERO gdy dobiliśmy do dna I łowisko puste (wszystko złowione albo uciekło).
+  // Niezłowione ryby przepadają dopiero po ucieczce. (Utrata żyć kończy natychmiast; endless nie odpala.)
+  if (!s.endless && localM >= s.descentM && s.fish.length === 0 && s.latched.length === 0) {
     s.clearTimer += dt;
     if (s.clearTimer >= CLEAR_DELAY) descentCleared(s);
   } else s.clearTimer = 0;

@@ -62,7 +62,7 @@ export function createGame() {
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [], endless: false,
     rockets: [], rocketCd: 0, rocketTarget: null, // wyrzutnia: pociski + cooldown + ZABLOKOWANY cel
-    durability: 0, durabilityMax: 0, durDraining: false, clearTimer: 0, endElapsed: 0, // pasek + opóźnienia końca
+    durability: 0, durabilityMax: 0, durDraining: false, clearTimer: 0, endElapsed: 0, descentM: 0, bottomT: 0, // pasek + opóźnienia końca + długość opadania + czas na dnie
     lastResult: null,
   };
 }
@@ -237,9 +237,11 @@ export function startStage(s) {
   s.durabilityMax = s.hook.dur; s.durability = s.durabilityMax; s.clearTimer = 0; // pełna wytrzymałość na start
   const stage = STAGES[s.stageIndex];
   s.stageOffsetM = stage.difficultyOffsetM;
+  s.descentM = stage.descentM;
+  s.bottomT = 0;
   // spawn MIESZANY (nie falami): każdej rybie losujemy pozycję w sekwencji z okna wg trudności —
   // bass dominuje na starcie, sumy dochodzą po chwili (mieszają się z bassami), muskie na sam koniec.
-  const SPAWN_WIN = { plotka: [0.0, 0.82], sredniak: [0.28, 1.0], twardziel: [0.92, 1.0] };
+  const SPAWN_WIN = { plotka: [0.0, 0.72], sredniak: [0.25, 0.82], twardziel: [0.85, 1.0] };
   const items = [];
   for (const t of ['plotka', 'sredniak', 'twardziel']) {
     const w = SPAWN_WIN[t] || [0, 1];
