@@ -2,7 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, placeHook, placeAccessory, startStage } from '../src/state.js';
 import { stepDescent } from '../src/sim.js';
+import { createFish } from '../src/logic/spawn.js';
 import { WORLD } from '../src/config.js';
+
+// perfekcyjny pościg: gdy ryba odpięta i minął bufor, wróć nią na hak (symuluje gracza goniącego rybę)
+function chase(s, f, hookX) {
+  if (f.state === 'escaped' && (f.recatchLock || 0) <= 0) { f.x = hookX; f.y = s.depthPx + HOOK_Y; }
+}
 
 function started() {
   // realny loadout: rusty hak (atk1) + brązowy hak (+3 = atk4) — jak po tutorialu
@@ -152,6 +158,56 @@ test('durability: słaba ryba (atk<=dur) NIE drenuje paska ani żyć', () => {
   assert.equal(s.durability, dur0);    // sum atk2 <= dur6 -> zero drenażu
   assert.equal(s.lives, 3);
   assert.equal(s.durDraining, false);  // flaga wraca do false (wskaźnik nie zostaje podświetlony)
+});
+
+test('balans: muskie na stage 1 (tylko brąz) ucieka - niełowialny nawet przy pościgu', () => {
+  const s = started();                              // brąz: atk 4, dur 6
+  s.fishQueue = [];
+  const hookX = 200;
+  const muskie = createFish('twardziel', 0, hookX, () => 0.5); // hp stałe 32
+  muskie.y = s.depthPx + HOOK_Y; muskie.x = hookX; muskie.state = 'aggro';
+  s.fish.push(muskie);
+  let safety = 0;
+  while (s.fish.includes(muskie) && s.mode === 'DESCENT' && safety++ < 6000) {
+    stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+    chase(s, muskie, hookX);
+  }
+  assert.equal(s.stunned, 0);                       // NIE złowiony (2 zaczepy < hp32)
+  assert.ok(s.lives <= 1);                          // pościg = 2 zerwania = 2 serca
+});
+
+test('balans: muskie na stage 2 (kotwica) łowialny kosztem 1 serca', () => {
+  const s = createGame(); placeHook(s, 0, 0); placeAccessory(s, 'bronze');
+  s.progress.inventory.anchor = 1; s.progress.tutAnchorDone = true; placeAccessory(s, 'anchor'); // atk6, bez dur
+  startStage(s);                                    // przelicza hak
+  s.fishQueue = [];
+  const hookX = 200;
+  const muskie = createFish('twardziel', 0, hookX, () => 0.5);
+  muskie.y = s.depthPx + HOOK_Y; muskie.x = hookX; muskie.state = 'aggro';
+  s.fish.push(muskie);
+  let safety = 0;
+  while (s.fish.includes(muskie) && s.mode === 'DESCENT' && safety++ < 6000) {
+    stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+    chase(s, muskie, hookX);
+  }
+  assert.equal(s.stunned, 1);                       // złowiony (2 zaczepy: 42.9 >= hp32)
+  assert.equal(s.lives, 2);                         // dokładnie 1 stracone serce
+});
+
+test('balans: muskie z Odważnikiem (stage 4) łowialny bez utraty serca', () => {
+  const s = createGame(); placeHook(s, 0, 0); placeAccessory(s, 'bronze');
+  s.progress.inventory.anchor = 1; s.progress.tutAnchorDone = true; placeAccessory(s, 'anchor');
+  s.progress.inventory.weight = 1; placeAccessory(s, 'weight'); // dur 8
+  startStage(s);
+  s.fishQueue = [];
+  const hookX = 200;
+  const muskie = createFish('twardziel', 0, hookX, () => 0.5);
+  muskie.y = s.depthPx + HOOK_Y; muskie.x = hookX; muskie.state = 'aggro';
+  s.fish.push(muskie);
+  let safety = 0;
+  while (s.stunned === 0 && s.mode === 'DESCENT' && safety++ < 3000) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.stunned, 1);                       // złowiony w jednym pasku
+  assert.equal(s.lives, 3);                         // bez utraty serca
 });
 
 test('descent runs many steps without throwing and accrues depth', () => {

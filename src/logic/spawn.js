@@ -16,7 +16,7 @@ export function pickFishType(depthMeters, rng = Math.random) {
 
 export function createFish(typeId, depthMeters, x, rng = Math.random) {
   const t = FISH_TYPES[typeId];
-  const hp = Math.round(t.hp * difficultyAt(depthMeters).hpMul);
+  const hp = t.hp;                  // HP stałe per gatunek (bez skalowania głębokością)
   return {
     type: typeId, x, y: 0, hp, hpMax: hp, window: t.window, windowLeft: 0,
     state: 'patrol', dir: x < 270 ? 1 : -1, bubbleY: 0,

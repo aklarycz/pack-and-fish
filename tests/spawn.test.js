@@ -15,12 +15,12 @@ test('pickFishType uses rng across weighted mix', () => {
   assert.equal(pickFishType(25, () => 0.95), 'twardziel');
 });
 
-test('createFish applies depth hp multiplier and copies type stats', () => {
+test('createFish uses constant per-species hp (bez skalowania głębokością) and copies type stats', () => {
   const f = createFish('plotka', 0, 100);
   assert.equal(f.hp, FISH_TYPES.plotka.hp);
   assert.equal(f.hpMax, f.hp);
   assert.equal(f.type, 'plotka');
   assert.equal(f.state, 'patrol');
   const deep = createFish('plotka', 100, 100);
-  assert.ok(deep.hp > FISH_TYPES.plotka.hp);  // hpMul > 1
+  assert.equal(deep.hp, FISH_TYPES.plotka.hp);  // to samo hp niezależnie od głębokości
 });

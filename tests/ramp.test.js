@@ -9,10 +9,10 @@ test('spawn interval tightens with depth but never below floor', () => {
   assert.ok(deep.spawnInterval >= 0.45);
 });
 
-test('hp and speed multipliers grow monotonically from 1', () => {
-  assert.equal(difficultyAt(0).hpMul, 1);
-  assert.ok(difficultyAt(50).hpMul > difficultyAt(10).hpMul);
+test('speed multiplier grows with depth; HP nie jest skalowane (stałe per gatunek)', () => {
+  assert.equal(difficultyAt(0).speedMul, 1);
   assert.ok(difficultyAt(50).speedMul > 1);
+  assert.equal(difficultyAt(50).hpMul, undefined);   // brak skalowania hp
 });
 
 test('mix shifts toward harder fish with depth', () => {

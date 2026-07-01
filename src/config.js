@@ -56,7 +56,7 @@ export const GRAB_DELAY = 0.15; // s kontaktu zanim ryba się zaczepi (pozwala o
 // Zerwanie żyłki: ryba drenująca pasek, której nie dobito w obrębie JEDNEGO paska, odpada z haka
 // (state 'escaped') i ucieka. Można ją zaczepić RECATCH_LIMIT razy ponownie; potem ucieka szybko.
 export const RECATCH_LIMIT = 1;        // ile razy odpiętą rybę można zaczepić ponownie
-export const RECATCH_LOCK = 0.8;       // s bufora po zerwaniu zanim ryba może znów się zaczepić
+export const RECATCH_LOCK = 2.0;       // s bufora po zerwaniu zanim ryba może znów się zaczepić (tarcza widoczna)
 export const ESCAPE_SPEED_SLOW = 35;   // px/s ucieczki po 1. zerwaniu (świat, ku powierzchni)
 export const ESCAPE_SPEED_FAST = 160;  // px/s ucieczki po 2. zerwaniu (bez re-latchu)
 
@@ -69,10 +69,11 @@ export const BRONZE_HOOK = {
   id: 'bronze', name: 'Brązowy hak', kind: 'accessory', mount: 'hook', rarity: 'uncommon',
   atk: 3, dur: 4, slots: 1, w: 1, h: 1, desc: '+3 atk, +4 wytrzymałości (na haku)',
 };
-// Kotwica — z 1. skrzyni: +1 jednoczesny zaczep, +1 atk, +3 wytrzymałości.
+// Kotwica — z 1. skrzyni: +1 jednoczesny zaczep (po połączeniu) + 2 atk. BEZ wytrzymałości —
+// ta idzie z Odważnika (stage 4). Dzięki większemu atk muskie łowialny od stage 2, ale kosztem serca.
 export const ANCHOR = {
   id: 'anchor', name: 'Kotwica', kind: 'accessory', mount: 'hook', rarity: 'rare',
-  maxLatch: 1, atk: 1, dur: 3, slots: 1, w: 1, h: 1, desc: '+1 ryba naraz, +1 atk, +3 wytrz. (połącz z hakiem)',
+  maxLatch: 1, atk: 2, slots: 1, w: 1, h: 1, desc: '+2 atk, +1 ryba naraz (połącz z hakiem)',
 };
 // Wyrzutnia rakiet — z 2. skrzyni: AUTONOMICZNA (działa niezależnie od połączenia). Co `rocketInterval` s
 // namierza najbliższą rybę (zaczepioną lub nie), nakłada mark i zdejmuje `rocketDmg` hp. Zajmuje 2 sloty.
@@ -132,9 +133,10 @@ export const FISH_TYPES = {
   plotka:    { id: 'plotka',    hp: 6,  atk: 1,  speed: 108, aggroRange: 130, radius: 44, color: '#7fd1ff', scoreValue: 1, coins: 1, behavior: 'flee' },
   // sum (średnia): UCIEKA; atk 2 ≤ durability każdego haka → bezpieczny do łowienia.
   sredniak:  { id: 'sredniak',  hp: 12, atk: 2,  speed: 72,  aggroRange: 150, radius: 76, color: '#ffd166', scoreValue: 3, coins: 3, behavior: 'flee' },
-  // muskie (duża): ATAKUJE hak. atk 10 ≫ durability bazowego brązu (6) → zdziera 3 serca ~pod koniec łowu
-  // (bramka na upgrade). Od kotwicy (dur 9, atk−dur=1) pasek prawie nie spada → łowialny.
-  twardziel: { id: 'twardziel', hp: 48, atk: 10, speed: 90,  aggroRange: 210, radius: 119, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
+  // muskie (duża): ATAKUJE hak. atk 10 > dur brązu (6) → zrywa żyłkę (bramka na upgrade).
+  // Stage 1 (brąz, atk4): niełowialny, ucieka. Stage 2 (kotwica, atk6): łowialny w 2 zaczepach = 1 serce.
+  // Stage 4 (Odważnik, dur8): pasek starcza na dobicie → 0 serc. HP/atk STAŁE (bez skalowania głębokością).
+  twardziel: { id: 'twardziel', hp: 32, atk: 10, speed: 90,  aggroRange: 210, radius: 119, color: '#ef476f', scoreValue: 6, coins: 8, behavior: 'attack' },
 };
 
 // Rampa wg głębokości (metry). Wartości interpolowane/progowane w ramp.js.
@@ -142,10 +144,7 @@ export const RAMP = {
   baseSpawnInterval: 1.4,   // s między spawnami na starcie
   minSpawnInterval: 0.45,   // sufit gęstości
   spawnTightenPerM: 0.004,  // o ile skraca się interwał na metr
-  hpMulPerM: 0.006,         // wzrost HP na metr (zmniejszone z 0.012 — sumy były niełowialne
-                            // pod koniec stage'a: na ~40m ×1.46 dawało hp 29 > atk8·okno 27.2.
-                            // Teraz ×1.24 → hp ~25, łowialne gołym brązem przez cały stage)
-  speedMulPerM: 0.006,
+  speedMulPerM: 0.006,      // HP jest STAŁE per gatunek (bez skalowania); skaluje się tylko prędkość
   // miks archetypów: udział twardzieli/średniaków rośnie z głębokością
   mix: [
     { maxDepth: 8,   weights: { plotka: 1.0, sredniak: 0.0, twardziel: 0.0 } },

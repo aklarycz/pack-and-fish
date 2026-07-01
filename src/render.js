@@ -1030,6 +1030,16 @@ function renderDescent(ctx, s, hookX, hookY) {
     } else {
       ctx.fillStyle = t.color; ctx.beginPath(); ctx.arc(f.x, sy, t.radius, 0, Math.PI * 2); ctx.fill();
     }
+    // tarcza "nieuchwytna" — ryba po zerwaniu, której NIE można teraz zahaczyć: bufor po 1. zerwaniu
+    // (recatchLock) lub na stałe po 2. zerwaniu (recatchLeft<=0) aż ucieknie. Niebieski transparentny klosz.
+    if (f.state === 'escaped' && ((f.recatchLock || 0) > 0 || (f.recatchLeft || 0) <= 0)) {
+      const rr = t.radius + 6, pulse = 0.5 + 0.5 * Math.sin(nowD * 4);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(f.x, sy, rr, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(90,170,255,${0.14 + 0.06 * pulse})`; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = `rgba(130,200,255,${0.5 + 0.3 * pulse})`; ctx.stroke();
+      ctx.restore();
+    }
     // wskaźnik HP — na zaczepionej ORAZ na namierzonej przez rakietnicę (widać ubywanie hp).
     if (f.state === 'latched' || f.marked) {
       const w = t.radius * 2;

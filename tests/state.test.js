@@ -139,11 +139,11 @@ test('raw atk always counts; +fish (maxLatch) only when anchor connected to bron
   const s = createGame();
   s.grid.cells[0] = 'bronze'; s.grid.cells[8] = 'anchor'; // bronze i kotwica DALEKO (niepołączone)
   s.hook = computeHookStats(s.grid);
-  assert.equal(s.hook.atk, STARTER_HOOK.atk + 3 + 1); // raw atk: baza1 + brąz3 + kotwica1 = 5 (zawsze)
+  assert.equal(s.hook.atk, STARTER_HOOK.atk + 3 + 2); // raw atk: baza1 + brąz3 + kotwica2 = 6 (zawsze)
   assert.equal(s.hook.maxLatch, 1);                   // niepołączone → brak +ryba
   moveItem(s, 8, 1);                                  // kotwica obok brązowego haka
   assert.equal(s.hook.maxLatch, 2);                   // połączone → +1 ryba
-  assert.equal(s.hook.atk, STARTER_HOOK.atk + 3 + 1); // atk bez zmian (raw)
+  assert.equal(s.hook.atk, STARTER_HOOK.atk + 3 + 2); // atk bez zmian (raw)
 });
 
 test('rocket takes 2 grid slots and sets rocket stats (autonomous)', () => {
