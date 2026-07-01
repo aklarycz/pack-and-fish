@@ -16,16 +16,18 @@ let hookTY = 0;
 const HOOK_SPEED = 520; // px/s — max prędkość nadążania haka za palcem (3× wolniej niż "skok")
 
 // Dopasuj canvas do okna (portret 3:4) i przelicz layout — niezależnie od rozdzielczości.
+let dpr = 1;
 function fitCanvas() {
   const aspect = 9 / 16; // szer:wys — proporcje telefonu (węższy, wyższy)
   let h = window.innerHeight;
   let w = Math.round(h * aspect);
   if (w > window.innerWidth) { w = window.innerWidth; h = Math.round(w / aspect); }
-  canvas.width = w;
-  canvas.height = h;
+  dpr = Math.min(window.devicePixelRatio || 1, 3); // ostrość na hi-DPI (telefon 2-3×); cap 3 dla wydajności
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
-  layoutWorld(w, h);
+  layoutWorld(w, h);   // WORLD w CSS px (logika/feel bez zmian); render skalowany transformem dpr
   hookX = clampHookX(hookX || WORLD.W / 2);
   hookY = clampHookY(hookY || WORLD.hookStartY);
   hookTX = hookX; hookTY = hookY;
@@ -160,6 +162,7 @@ function loop(ts) {
   setTrack(s.mode === 'DESCENT' ? 'underwater' : 'home');
   setUnderwaterBoss(uwBoss);
   audioUpdate(dt);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // skala hi-DPI: rysujemy w CSS px, backing store w device px
   render(ctx, s, hookX, hookY);
   requestAnimationFrame(loop);
 }

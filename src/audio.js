@@ -64,5 +64,7 @@ export function audioUpdate(dt) {
     const target = (!muted && name === current) ? TRACKS[name].vol : 0;
     if (a.volume < target) a.volume = Math.min(target, a.volume + step);
     else if (a.volume > target) a.volume = Math.max(0, a.volume - step);
+    // retry: na mobile play() sprzed załadowania danych nie startuje — ponawiaj aż aktywna ścieżka gra
+    if (name === current && !muted && a.paused) a.play().catch(() => {});
   }
 }

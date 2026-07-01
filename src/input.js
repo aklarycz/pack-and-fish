@@ -6,8 +6,8 @@ export function attachInput(canvas, handlers) {
   const toCanvas = (e) => {
     const r = canvas.getBoundingClientRect();
     const p = (e.touches && e.touches[0]) || e;
-    const sx = canvas.width / r.width;
-    const sy = canvas.height / r.height;
+    const sx = WORLD.W / r.width;   // mapuj na WORLD (CSS px), nie na backing store (device px, dpr)
+    const sy = WORLD.H / r.height;
     return { x: (p.clientX - r.left) * sx, y: (p.clientY - r.top) * sy };
   };
   const down = (e) => { e.preventDefault(); const { x, y } = toCanvas(e); handlers.onPointerDown(x, y); };
