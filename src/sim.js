@@ -1,5 +1,5 @@
 // Czysta symulacja jednej klatki descentu (bez DOM). main.js woła to w pętli rAF.
-import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY, RECATCH_LIMIT, RECATCH_LOCK, BOTTOM_GRACE } from './config.js';
+import { WORLD, FISH_TYPES, STAGES, ROCKET_FLIGHT, DRAIN_K, GRAB_DELAY, RECATCH_LIMIT, RECATCH_LOCK, BOTTOM_GRACE, BOSS_LULL } from './config.js';
 
 const CLEAR_DELAY = 1.5; // s po opróżnieniu łowiska przy dnie zanim odpali ekran END (gracz zauważy)
 import { difficultyAt } from './logic/ramp.js';
@@ -11,6 +11,25 @@ import { addDepth, registerStun, registerEscape, descentCleared } from './state.
 function removeFish(s, f) {
   const i = s.fish.indexOf(f);
   if (i >= 0) s.fish.splice(i, 1);
+}
+
+// Tworzy rybę danego typu i pozycjonuje ją (z boku lub z dołu, poniżej pasma haka). Wspólne dla ławicy i bossa.
+function spawnFish(s, type, effDepthM, rng) {
+  const spawnTop = WORLD.hookMaxY + 50;
+  let fx, fy, fdir;
+  if (rng() < 0.75) {
+    const left = rng() < 0.5;
+    fx = left ? WORLD.hookMinX - 35 : WORLD.hookMaxX + 35;
+    fdir = left ? 1 : -1;
+    fy = s.depthPx + spawnTop + rng() * (WORLD.H - spawnTop);
+  } else {
+    fx = WORLD.hookMinX + rng() * (WORLD.hookMaxX - WORLD.hookMinX);
+    fdir = rng() < 0.5 ? 1 : -1;
+    fy = s.depthPx + WORLD.H + 30;
+  }
+  const f = createFish(type, effDepthM, fx, rng);
+  f.y = fy; f.dir = fdir;
+  s.fish.push(f);
 }
 
 // Zrywa rybę z haka: usuwa z latched, oznacza jako escaped. Pierwsze zerwanie -> wolna ucieczka +
@@ -51,32 +70,21 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
         : (r < 0.25 ? 'sredniak' : 'twardziel');
     s.fishQueue.push(tt);
   }
+  // ŁAWICA (płotka/sum) z worka — co interwał, dopóki nie dobiliśmy do dna.
   s.spawnTimer -= dt;
   if (s.spawnTimer <= 0 && s.fishQueue.length > 0 && (s.endless || localM < s.descentM)) {
     const sp = STAGES[s.stageIndex].spawn;
     s.spawnTimer = Math.max(sp.min, sp.start - localM * sp.perM);
-    const type = s.fishQueue.shift();   // worek easy->hard
-    // WSZYSTKIE ryby pojawiają się PONIŻEJ granicy ruchu haka (hookMaxY) — gracz
-    // zawsze widzi je nadpływające z dołu i ma czas zaplanować.
-    const spawnTop = WORLD.hookMaxY + 50;
-    let fx, fy, fdir;
-    if (rng() < 0.75) {
-      // z boku: tuż za krawędzią (w obrębie EDGE_MARGIN, by nie zawróciła od razu),
-      // na losowej wysokości poniżej granicy; płynie do środka
-      const left = rng() < 0.5;
-      fx = left ? WORLD.hookMinX - 35 : WORLD.hookMaxX + 35;
-      fdir = left ? 1 : -1;
-      fy = s.depthPx + spawnTop + rng() * (WORLD.H - spawnTop);
-    } else {
-      // z dołu: pełna szerokość, kierunek losowy
-      fx = WORLD.hookMinX + rng() * (WORLD.hookMaxX - WORLD.hookMinX);
-      fdir = rng() < 0.5 ? 1 : -1;
-      fy = s.depthPx + WORLD.H + 30;
+    spawnFish(s, s.fishQueue.shift(), effDepthM, rng);
+  }
+  // FALA BOSSA (muskie): gdy worek regularny pusty -> ławica odpływa, po BOSS_LULL wpływa muskie SAM na końcu.
+  if (!s.endless && !s.bossSpawned && s.fishQueue.length === 0 && s.bossCount > 0) {
+    for (const f of s.fish) if (f.state === 'patrol' || f.state === 'aggro') f.state = 'leaving'; // ławica robi miejsce
+    s.bossLullT += dt;
+    if (s.bossLullT >= BOSS_LULL) {
+      for (let k = 0; k < s.bossCount; k++) spawnFish(s, 'twardziel', effDepthM, rng);
+      s.bossSpawned = true;
     }
-    const f = createFish(type, effDepthM, fx, rng);
-    f.y = fy;
-    f.dir = fdir;
-    s.fish.push(f);
   }
 
   const hookWorldY = s.depthPx + hookScreenY;
@@ -175,9 +183,11 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
     }
   }
 
-  // DNO osiągnięte (descentM): najpierw OKNO ŁASKI (BOTTOM_GRACE) — ryby zachowują się normalnie,
-  // muskie atakuje i jest łowialny. Dopiero po nim pozostałe niezłowione ODPŁYWAJĄ (leaving).
-  if (localM >= s.descentM) {
+  // "spawningDone" = ławica wypuszczona I boss (muskie) już się pojawił (albo go nie ma).
+  const spawningDone = s.fishQueue.length === 0 && s.bossSpawned;
+  // DNO osiągnięte + wszystko wpłynęło: OKNO ŁASKI (BOTTOM_GRACE) — boss atakuje/łowialny,
+  // dopiero po nim niezłowione ODPŁYWAJĄ (leaving). Okno startuje dopiero gdy boss już jest.
+  if (localM >= s.descentM && spawningDone) {
     s.bottomT += dt;
     if (s.bottomT >= BOTTOM_GRACE) {
       for (const f of s.fish) if (f.state === 'patrol' || f.state === 'aggro') f.state = 'leaving';
@@ -189,9 +199,9 @@ export function stepDescent(s, hookX, hookScreenY, dt, rng = Math.random) {
   s.bubbles = s.bubbles.filter(b => b.bubbleY - s.depthPx > -40);
   s.fish = s.fish.filter(f => s.latched.indexOf(f) >= 0 || (f.y - s.depthPx) > -160); // znikają dopiero górą
 
-  // Stage kończy się DOPIERO gdy dobiliśmy do dna I łowisko puste (wszystko złowione albo uciekło).
-  // Niezłowione ryby przepadają dopiero po ucieczce. (Utrata żyć kończy natychmiast; endless nie odpala.)
-  if (!s.endless && localM >= s.descentM && s.fish.length === 0 && s.latched.length === 0) {
+  // Stage kończy się DOPIERO gdy: dobiliśmy do dna, boss się pojawił i łowisko puste (wszystko
+  // złowione albo uciekło). (Utrata żyć kończy natychmiast; endless nie odpala.)
+  if (!s.endless && localM >= s.descentM && spawningDone && s.fish.length === 0 && s.latched.length === 0) {
     s.clearTimer += dt;
     if (s.clearTimer >= CLEAR_DELAY) descentCleared(s);
   } else s.clearTimer = 0;

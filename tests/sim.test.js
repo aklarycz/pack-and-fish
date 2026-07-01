@@ -48,7 +48,7 @@ test('autonomous rocket marks nearest fish and damages it regardless of latch', 
   const s = started();
   s.progress.inventory.rocket = 1; placeAccessory(s, 'rocket');
   startStage(s);                                  // przelicza hook + init rocketCd
-  s.fishQueue = [];                               // bez nowych spawnów
+  s.fishQueue = []; s.bossSpawned = true;                               // bez nowych spawnów
   const hookX = 200, hookWorldY = s.depthPx + HOOK_Y;
   const f = { type: 'twardziel', x: hookX + 20, y: hookWorldY, hp: 6, hpMax: 60, window: 2, windowLeft: 2, state: 'patrol', dir: 1, bubbleY: 0 };
   s.fish.push(f);
@@ -62,7 +62,7 @@ test('autonomous rocket marks nearest fish and damages it regardless of latch', 
 test('rocket locks nearest target and keeps the mark (does not switch)', () => {
   const s = started();
   s.progress.inventory.rocket = 1; placeAccessory(s, 'rocket'); startStage(s);
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200, hwy = s.depthPx + HOOK_Y;
   const near = { type: 'plotka', x: hookX + 20, y: hwy, hp: 12, hpMax: 12, window: 3, windowLeft: 3, state: 'patrol', dir: 1, bubbleY: 0 };
   const far = { type: 'plotka', x: hookX + 240, y: hwy, hp: 12, hpMax: 12, window: 3, windowLeft: 3, state: 'patrol', dir: 1, bubbleY: 0 };
@@ -79,7 +79,7 @@ test('rocket locks nearest target and keeps the mark (does not switch)', () => {
 
 test('durability: muskie zrywa się po jednym pasku -> -1 serce, ryba escaped z zachowanym HP', () => {
   const s = started();                 // brąz: dur 6, atk haka 4
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200, hwy = s.depthPx + HOOK_Y;
   const muskie = { type: 'twardziel', x: hookX, y: hwy, hp: 48, hpMax: 48, state: 'aggro', dir: 1, bubbleY: 0 };
   s.fish.push(muskie);
@@ -94,7 +94,7 @@ test('durability: muskie zrywa się po jednym pasku -> -1 serce, ryba escaped z 
 
 test('durability: dobicie drenującej ryby przed zerwaniem odnawia pasek, bez utraty serca', () => {
   const s = started();
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200, hwy = s.depthPx + HOOK_Y;
   s.durability = s.durabilityMax - 1;             // pasek nadszarpnięty
   s.fish.push({ type: 'twardziel', x: hookX, y: hwy, hp: 2, hpMax: 48, state: 'aggro', dir: 1, bubbleY: 0 });
@@ -107,7 +107,7 @@ test('durability: dobicie drenującej ryby przed zerwaniem odnawia pasek, bez ut
 
 test('zerwana ryba re-latchuje raz na kontakt i kontynuuje od swojego HP', () => {
   const s = started();
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200, hwy = s.depthPx + HOOK_Y;
   const f = { type: 'twardziel', x: hookX, y: hwy, hp: 20, hpMax: 48,
               state: 'escaped', dir: 1, bubbleY: 0, breakoffs: 1, recatchLeft: 1, recatchLock: 0, escapeFast: false };
@@ -121,7 +121,7 @@ test('zerwana ryba re-latchuje raz na kontakt i kontynuuje od swojego HP', () =>
 
 test('po drugim zerwaniu ryba ucieka szybko i nie da się jej złapać', () => {
   const s = started();
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200, hwy = s.depthPx + HOOK_Y;
   const f = { type: 'twardziel', x: hookX, y: hwy, hp: 48, hpMax: 48,
               state: 'escaped', dir: 1, bubbleY: 0, breakoffs: 1, recatchLeft: 1, recatchLock: 0, escapeFast: false };
@@ -137,7 +137,7 @@ test('po drugim zerwaniu ryba ucieka szybko i nie da się jej złapać', () => {
 
 test('jeden muskie kosztuje maksymalnie 2 serca, potem znika z łowiska', () => {
   const s = started();
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200, hwy = s.depthPx + HOOK_Y;
   const f = { type: 'twardziel', x: hookX, y: hwy, hp: 9999, hpMax: 9999, state: 'aggro', dir: 1, bubbleY: 0 };
   s.fish.push(f);
@@ -150,7 +150,7 @@ test('jeden muskie kosztuje maksymalnie 2 serca, potem znika z łowiska', () => 
 
 test('durability: słaba ryba (atk<=dur) NIE drenuje paska ani żyć', () => {
   const s = started();
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200, hwy = s.depthPx + HOOK_Y;
   const dur0 = s.durability;
   s.fish.push({ type: 'sredniak', x: hookX, y: hwy, hp: 9999, hpMax: 9999, state: 'aggro', dir: 1, bubbleY: 0 });
@@ -162,7 +162,7 @@ test('durability: słaba ryba (atk<=dur) NIE drenuje paska ani żyć', () => {
 
 test('balans: muskie na stage 1 (tylko brąz) ucieka - niełowialny nawet przy pościgu', () => {
   const s = started();                              // brąz: atk 4, dur 6
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200;
   const muskie = createFish('twardziel', 0, hookX, () => 0.5); // hp stałe 32
   muskie.y = s.depthPx + HOOK_Y; muskie.x = hookX; muskie.state = 'aggro';
@@ -180,7 +180,7 @@ test('balans: muskie na stage 2 (kotwica) łowialny kosztem 1 serca', () => {
   const s = createGame(); placeHook(s, 0, 0); placeAccessory(s, 'bronze');
   s.progress.inventory.anchor = 1; s.progress.tutAnchorDone = true; placeAccessory(s, 'anchor'); // atk6, bez dur
   startStage(s);                                    // przelicza hak
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200;
   const muskie = createFish('twardziel', 0, hookX, () => 0.5);
   muskie.y = s.depthPx + HOOK_Y; muskie.x = hookX; muskie.state = 'aggro';
@@ -199,7 +199,7 @@ test('balans: muskie z Odważnikiem (stage 4) łowialny bez utraty serca', () =>
   s.progress.inventory.anchor = 1; s.progress.tutAnchorDone = true; placeAccessory(s, 'anchor');
   s.progress.inventory.weight = 1; placeAccessory(s, 'weight'); // dur 8
   startStage(s);
-  s.fishQueue = [];
+  s.fishQueue = []; s.bossSpawned = true;
   const hookX = 200;
   const muskie = createFish('twardziel', 0, hookX, () => 0.5);
   muskie.y = s.depthPx + HOOK_Y; muskie.x = hookX; muskie.state = 'aggro';
@@ -213,6 +213,7 @@ test('balans: muskie z Odważnikiem (stage 4) łowialny bez utraty serca', () =>
 test('stage kończy się po descentM gdy ryby wypłyną górą (nie od razu przy dnie)', () => {
   const s = started();
   s.descentM = 5;                                   // krótkie opadanie
+  s.bossCount = 0; s.bossSpawned = true;            // izolacja od fali bossa
   s.fishQueue = ['plotka', 'plotka', 'plotka'];     // worek NADAL pełny
   const straggler = { type: 'plotka', x: 200, y: s.depthPx + 300, hp: 9999, hpMax: 9999, state: 'patrol', dir: 1, bubbleY: 0 };
   s.fish.push(straggler);                            // niezłowiona ryba na ekranie
@@ -229,11 +230,27 @@ test('stage kończy się po descentM gdy ryby wypłyną górą (nie od razu przy
 test('pusty worek NIE kończy stage przedwcześnie (trwa do descentM)', () => {
   const s = started();
   s.descentM = 4;
-  s.fishQueue = []; s.fish = []; s.latched = [];     // brak ryb od startu
+  s.fishQueue = []; s.bossSpawned = true; s.fish = []; s.latched = [];     // brak ryb od startu
   let safety = 0;
   while (s.mode === 'DESCENT' && safety++ < 5000) stepDescent(s, 200, HOOK_Y, 1 / 60, () => 0.5);
   assert.equal(s.mode, 'END');
   assert.ok(s.depthPx / WORLD.pxPerMeter >= 4);      // skończył się DOPIERO po głębokości
+});
+
+test('boss (muskie) spawnuje się SAM po opróżnieniu worka regularnego + cisza (nie w grupie)', () => {
+  const s = started();
+  s.descentM = 999;                          // nie kończymy stage przez głębokość w tym teście
+  s.fish = []; s.latched = [];
+  s.fishQueue = ['plotka', 'plotka'];        // mały worek regularny
+  s.bossCount = 1; s.bossSpawned = false; s.bossLullT = 0;
+  const hookX = 200;
+  let safety = 0;
+  while (!s.bossSpawned && safety++ < 4000) stepDescent(s, hookX, HOOK_Y, 1 / 60, () => 0.5);
+  assert.equal(s.bossSpawned, true);
+  assert.equal(s.fishQueue.length, 0);                     // boss dopiero po opróżnieniu worka
+  assert.ok(s.fish.some(f => f.type === 'twardziel'));     // muskie wpłynął jako fala bossa
+  // żadna regularna ryba nie jest już w stanie patrol/aggro (zrobiły miejsce -> leaving/zniknęły)
+  assert.ok(s.fish.every(f => f.type === 'twardziel' || f.state === 'leaving'));
 });
 
 test('descent runs many steps without throwing and accrues depth', () => {

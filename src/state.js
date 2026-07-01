@@ -1,7 +1,8 @@
 import { STARTER_HOOK, ITEMS, BACKPACK, WORLD, STAGES, CHEST_SC, ARENA_COUNT, STAGES_PER_ARENA, AVAILABLE_ARENAS, PLAYABLE_STAGES, arenaOf, localOf, tackleboxOf } from './config.js';
 import { createGrid, placeItem, findFreeRun, findFreeRunAvoiding, itemOrigin, gridItems, bronzeComponent } from './logic/backpack.js';
 import { computeScore, computeStars } from './logic/scoring.js';
-import { loadProgress, saveProgress } from './persistence.js';
+import { loadProgress, saveProgress, clearProgress } from './persistence.js';
+export { clearProgress };
 
 // Staty haka. Zardzewiały hak NIE jest itemem — to bazowe staty gracza (zawsze coś wisi na lince).
 // Grid trzyma TYLKO akcesoria. RAW atk dolicza KAŻDE położone akcesorium (niezależnie od ułożenia).
@@ -58,11 +59,13 @@ export function createGame() {
     bpInvDrag: null,      // przeciągany item Z tacki inventory { id, x, y, ox, oy, moved }
     bpInvScroll: 0,       // offset przewinięcia tacki inventory (px)
     bpInvScrollDrag: null,// aktywne przewijanie tacki { oy, start }
+    resetArm: false,      // przycisk resetu postępu uzbrojony (wymaga 2. tapnięcia)
     // pola descentu (resetowane w startStage)
     lives: 3, depthPx: 0, stunned: 0, stunnedPoints: 0, coinsEarned: 0, score: 0, stars: 0,
     fish: [], latched: [], bubbles: [], spawnTimer: 0, stageOffsetM: 0, fishQueue: [], endless: false,
     rockets: [], rocketCd: 0, rocketTarget: null, // wyrzutnia: pociski + cooldown + ZABLOKOWANY cel
     durability: 0, durabilityMax: 0, durDraining: false, clearTimer: 0, endElapsed: 0, descentM: 0, bottomT: 0, // pasek + opóźnienia końca + długość opadania + czas na dnie
+    bossCount: 0, bossSpawned: true, bossLullT: 0, // muskie jako fala bossa (po opróżnieniu worka)
     lastResult: null,
   };
 }
@@ -241,14 +244,18 @@ export function startStage(s) {
   s.bottomT = 0;
   // spawn MIESZANY (nie falami): każdej rybie losujemy pozycję w sekwencji z okna wg trudności —
   // bass dominuje na starcie, sumy dochodzą po chwili (mieszają się z bassami), muskie na sam koniec.
-  const SPAWN_WIN = { plotka: [0.0, 0.72], sredniak: [0.25, 0.82], twardziel: [0.85, 1.0] };
+  // regularne ryby (płotka+sum) -> kolejka wg klucza; MUSKIE osobno jako boss (fala na końcu)
+  const SPAWN_WIN = { plotka: [0.0, 0.85], sredniak: [0.2, 1.0] };
   const items = [];
-  for (const t of ['plotka', 'sredniak', 'twardziel']) {
+  for (const t of ['plotka', 'sredniak']) {
     const w = SPAWN_WIN[t] || [0, 1];
     for (let k = 0; k < (stage.bag[t] || 0); k++) items.push({ t, key: w[0] + Math.random() * (w[1] - w[0]) });
   }
   items.sort((a, b) => a.key - b.key);
   s.fishQueue = items.map(it => it.t);
+  s.bossCount = stage.bag.twardziel || 0;   // muskie = boss, spawnuje się SAM po opróżnieniu worka + cisza
+  s.bossSpawned = s.bossCount === 0;
+  s.bossLullT = 0;
   s.mode = 'DESCENT';
   return true;
 }

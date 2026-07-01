@@ -3,7 +3,7 @@ import { computeStars } from './logic/scoring.js';
 import { gridItems, itemOrigin, bronzeComponent } from './logic/backpack.js';
 
 // --- proste ładowanie sprite'ów (Image tworzony leniwie, tylko w przeglądarce) ---
-const ASSET_VER = 'b46'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
+const ASSET_VER = 'b47'; // bumpuj, by wymusić refetch assetów (omija cache obrazków przeglądarki)
 const _imgCache = {};
 function img(src) {
   let im = _imgCache[src];
@@ -581,8 +581,16 @@ function renderHome(ctx, s) {
   ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = `bold ${Math.round(H * 0.015)}px monospace`; ctx.textAlign = 'left';
   ctx.fillText(BUILD, W * 0.02, H * 0.86);
 
+  // przycisk RESET postępu (dev/test) — dwa tapnięcia potwierdzają
+  const rbw = W * 0.30, rbh = H * 0.038, rbx = W * 0.02, rby = H * 0.885;
+  const resetRect = { x: rbx, y: rby, w: rbw, h: rbh };
+  fillRR(ctx, rbx, rby, rbw, rbh, 8, s.resetArm ? 'rgba(154,75,75,0.95)' : 'rgba(14,34,51,0.8)');
+  rrPath(ctx, rbx, rby, rbw, rbh, 8); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = s.resetArm ? '#fff' : 'rgba(207,226,245,0.7)'; ctx.font = `bold ${Math.round(H * 0.017)}px sans-serif`; ctx.textAlign = 'center';
+  ctx.fillText(s.resetArm ? 'Na pewno? Tap' : 'Reset postępu', rbx + rbw / 2, rby + rbh * 0.68);
+
   ctx.textAlign = 'left';
-  s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest, stageNodes };
+  s._home = { stage: catRect, left: homeLeft, right: homeRight, start, backpack, chest, stageNodes, reset: resetRect };
 
   // overlay otwarcia skrzynki — pokazuje IKONĘ otrzymanego itemu + nazwę + opis (gracz musi wiedzieć co dostał)
   if (s.chestReveal) {

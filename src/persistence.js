@@ -54,6 +54,11 @@ export function loadProgress(stageCount) {
   return prog;
 }
 
+// Czyści zapis (ręczny reset progresu w grze). Po nim createGame() zwróci domyślny stan.
+export function clearProgress() {
+  try { if (typeof localStorage !== 'undefined') localStorage.removeItem(KEY); } catch (e) { /* brak dostępu */ }
+}
+
 export function saveProgress(prog) {
   try {
     if (typeof localStorage !== 'undefined') {

@@ -1,5 +1,5 @@
 import { WORLD, BACKPACK, layoutWorld, CAST_DUR, ITEMS, TEST_ENDLESS_DESCENT } from './config.js';
-import { createGame, placeHook, placeAccessory, placeAccessoryAt, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest, loginGuest } from './state.js';
+import { createGame, placeHook, placeAccessory, placeAccessoryAt, selectAccessory, selectPlaced, unequipAccessory, moveItem, startStage, stageUnlocked, carouselMove, arenaMove, selectStageIndex, openBackpack, closeBackpack, returnHome, openChest, dismissChest, loginGuest, clearProgress } from './state.js';
 import { stepDescent } from './sim.js';
 import { attachInput, clampHookX, clampHookY } from './input.js';
 import { render } from './render.js';
@@ -52,6 +52,12 @@ attachInput(canvas, {
       if (s.chestReveal) { dismissChest(s); return; }  // tap zamyka reveal skrzynki
       const h = s._home;
       if (!h) return;
+      if (h.reset && hit(h.reset, x, y)) {                 // reset postępu: 1. tap uzbraja, 2. tap czyści
+        if (s.resetArm) { clearProgress(); s = createGame(); s.splash = false; }
+        else s.resetArm = true;
+        return;
+      }
+      s.resetArm = false;                                  // tap gdziekolwiek indziej rozbraja
       if (h.chest && hit(h.chest, x, y)) { openChest(s); return; }
       if (hit(h.left, x, y)) { arenaMove(s, -1); return; }   // strzałki = zmiana ARENY
       if (hit(h.right, x, y)) { arenaMove(s, 1); return; }

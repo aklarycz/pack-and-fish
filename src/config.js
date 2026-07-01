@@ -62,6 +62,7 @@ export const ESCAPE_SPEED_FAST = 160;  // px/s ucieczki po 2. zerwaniu (bez re-l
 export const LEAVE_SPEED = 90;         // px/s odpływania ryb po dobiciu do dna (ku krawędzi, za ekran)
 export const BOTTOM_GRACE = 4;         // s po dobiciu do dna, w których ryby zachowują się normalnie
                                        // (muskie atakuje/łowialny) ZANIM zaczną odpływać
+export const BOSS_LULL = 2.5;          // s ciszy po opróżnieniu worka regularnego zanim wpłynie boss (muskie)
 
 // Akcesoria. `slots` = ile komórek gridu (poziomo) zajmuje item — tacklebox 3×3 = 9 slotów
 // pojemności, więc itemy wieloslotowe to wybór builda. `mount` = jak rysuje się na żyłce:
@@ -181,17 +182,19 @@ export const STAGES_PER_ARENA = 10;
 // Stage 1: spokojny intro (maxLatch 1). Stage 2+: kotwica (maxLatch 2). d = descentM (metry = sekundy
 // opadania, bo 1 m/s). Gęstość (spawn) rośnie s1–s5, max płaska s6–s10. Worek ≈ d/spawn (wypełnia opadanie).
 // depthCap wyliczane w buildArenaStages = d + difficultyOffsetM (depth zawsze osiąga sufit).
+// p/s = worek regularnych ryb (płotka/sum) — dobrany tak, by kończyć się ~70% zjazdu, zostawiając
+// czas na FALĘ BOSSA. m = muskie (boss) — spawnuje się SAM po opróżnieniu worka + BOSS_LULL cisza.
 const ARENA1_STAGES = [
-  { p: 15, s: 4,  m: 1, d: 32, spawn: 1.60 },
-  { p: 19, s: 6,  m: 1, d: 36, spawn: 1.40 },
-  { p: 22, s: 9,  m: 2, d: 40, spawn: 1.20 },
-  { p: 28, s: 12, m: 2, d: 44, spawn: 1.05 },
-  { p: 33, s: 17, m: 3, d: 48, spawn: 0.90 },
-  { p: 36, s: 19, m: 3, d: 52, spawn: 0.90 },
-  { p: 37, s: 21, m: 4, d: 56, spawn: 0.90 },
-  { p: 39, s: 24, m: 4, d: 60, spawn: 0.90 },
-  { p: 40, s: 26, m: 5, d: 64, spawn: 0.90 },
-  { p: 42, s: 29, m: 5, d: 68, spawn: 0.90 },
+  { p: 11, s: 3,  m: 1, d: 32, spawn: 1.60 },
+  { p: 13, s: 5,  m: 1, d: 36, spawn: 1.40 },
+  { p: 16, s: 7,  m: 2, d: 40, spawn: 1.20 },
+  { p: 20, s: 9,  m: 2, d: 44, spawn: 1.05 },
+  { p: 25, s: 12, m: 3, d: 48, spawn: 0.90 },
+  { p: 27, s: 14, m: 3, d: 52, spawn: 0.90 },
+  { p: 29, s: 15, m: 4, d: 56, spawn: 0.90 },
+  { p: 31, s: 17, m: 4, d: 60, spawn: 0.90 },
+  { p: 33, s: 18, m: 5, d: 64, spawn: 0.90 },
+  { p: 35, s: 20, m: 5, d: 68, spawn: 0.90 },
 ];
 
 // Progi gwiazdek wg REALNIE osiągalnego score per epoka sprzętu (nie % teoretycznego maxa).
