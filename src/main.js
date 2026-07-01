@@ -124,9 +124,10 @@ attachInput(canvas, {
     hookDrag = null;   // koniec gestu sterowania hakiem
     if (s.mode === 'BACKPACK') {
       if (s.bpDrag) {
-        const to = cellAt(s._grid, x, y);
-        if (s.bpDrag.moved && to >= 0 && to !== s.bpDrag.fromIdx) moveItem(s, s.bpDrag.fromIdx, to);
-        else selectPlaced(s, s.bpDrag.fromIdx); // tap (bez przesunięcia) = opis
+        if (s.bpDrag.moved) {                    // przeciągnięcie: przenieś (jeśli wolna kratka); NIGDY nie otwieraj popupu
+          const to = cellAt(s._grid, x, y);
+          if (to >= 0 && to !== s.bpDrag.fromIdx) moveItem(s, s.bpDrag.fromIdx, to);
+        } else selectPlaced(s, s.bpDrag.fromIdx); // czysty tap = opis/popup
         s.bpDrag = null;
       } else if (s.bpInvDrag) {
         const to = cellAt(s._grid, x, y);
