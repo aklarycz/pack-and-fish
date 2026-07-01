@@ -36,3 +36,6 @@ npm-debug.log*
 # Dev helpers (lokalny serwer / podglady)
 __serve.py
 __*.html
+
+# Build artefakt (nie trzymamy w repo)
+packfish-web.zip
